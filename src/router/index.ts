@@ -61,6 +61,11 @@ const router = createRouter({
       component: () => import('../pages/PromptPage.vue'),
     },
     {
+      path: '/manage',
+      name: 'manage',
+      component: () => import('../pages/QuestionManager.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

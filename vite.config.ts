@@ -63,7 +63,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: [
-          "**/*.{js,css,html,ico,png,svg,woff,woff2,json,webmanifest}",
+          "**/*.{js,css,html,ico,png,woff,woff2,json,webmanifest}",
         ],
         globIgnores: [
           "**/assets/pdf.worker-*.mjs",

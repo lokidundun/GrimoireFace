@@ -2,7 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStudyStore } from '@/stores/useStudyStore'
-import { useAIStore, buildQuestionSystemSuffix, getAIQuickActions } from '@/stores/useAIStore'
+import { useAIStore, buildQuestionSystemSuffix, getAIQuickActions, AI_PROVIDER_PRESETS, getAIProviderPreset } from '@/stores/useAIStore'
+import type { AIProviderId } from '@/stores/useAIStore'
 import { useQuestion, useQuestions } from '@/composables/useQuestions'
 import { useBufferedText } from '@/composables/useBufferedText'
 import {
@@ -72,6 +73,45 @@ const showAI = ref(false)
 const aiInput = ref('')
 const aiMessages = ref<AIMessage[]>([])
 const { text: streamedText, appendText: appendStreamText, resetText: resetStreamText } = useBufferedText()
+
+// ─── Inline Model Selector ────────────────────────────────────────────────────
+
+const showModelDropdown = ref(false)
+const modelDropdownRef = ref<HTMLElement | null>(null)
+
+const currentModelLabel = computed(() => {
+  if (ai.config.provider === 'custom') return ai.config.model || '自定义模型'
+  const preset = getAIProviderPreset(ai.config.provider)
+  const model = preset.models.find((m) => m.value === ai.config.model)
+  return model?.label || ai.config.model || '选择模型'
+})
+
+const authenticatedPresetProviders = computed(() =>
+  AI_PROVIDER_PRESETS.filter((p) => p.id !== 'custom' && ai.isProviderAuthenticated(p.id)),
+)
+
+const hasAuthenticatedProviders = computed(() => {
+  if (ai.isProviderAuthenticated('custom')) return true
+  return authenticatedPresetProviders.value.length > 0
+})
+
+function selectModel(providerId: AIProviderId, modelValue: string) {
+  ai.updateConfig({ provider: providerId, model: modelValue })
+  showModelDropdown.value = false
+}
+
+function handleModelClickOutside(e: MouseEvent) {
+  if (modelDropdownRef.value && !modelDropdownRef.value.contains(e.target as Node)) {
+    showModelDropdown.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleModelClickOutside)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', handleModelClickOutside)
+})
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
@@ -607,7 +647,100 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
           </div>
         </div>
         <!-- Input -->
-        <div style="display: flex; gap: 6px">
+        <div style="display: flex; gap: 6px; align-items: center">
+          <!-- Inline Model Selector -->
+          <div ref="modelDropdownRef" style="position: relative; flex-shrink: 0">
+            <button
+              type="button"
+              @click.stop="showModelDropdown = !showModelDropdown"
+              :disabled="!ai.config.enabled"
+              style="
+                display: flex; align-items: center; gap: 3px;
+                padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border);
+                background: var(--surface); color: var(--text-2); font-size: 12px;
+                cursor: pointer; white-space: nowrap; transition: all 0.15s;
+              "
+              :style="showModelDropdown ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}"
+            >
+              <span style="max-width: 80px; overflow: hidden; text-overflow: ellipsis">{{ currentModelLabel }}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; opacity: 0.6">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div
+              v-if="showModelDropdown"
+              style="
+                position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 50;
+                min-width: 200px; max-height: 320px; overflow-y: auto;
+                background: var(--surface); border: 1px solid var(--border);
+                border-radius: 12px; box-shadow: var(--shadow-lg);
+                padding: 6px; animation: slide-down 0.15s var(--ease-out) both;
+              "
+            >
+              <div v-if="!hasAuthenticatedProviders" style="padding: 12px 8px; text-align: center">
+                <div style="font-size: 12px; color: var(--text-3); margin-bottom: 6px">尚未配置任何 API Key</div>
+                <span style="font-size: 12px; color: var(--text-3)">请前往设置 → 认证 中配置</span>
+              </div>
+
+              <template v-else v-for="(preset, pIdx) in authenticatedPresetProviders" :key="preset.id">
+                <div
+                  v-if="pIdx > 0"
+                  style="height: 1px; background: var(--border-subtle); margin: 4px 6px"
+                />
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-3); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.5px">{{ preset.shortLabel }}</div>
+                <button
+                  v-for="m in preset.models"
+                  :key="m.value"
+                  type="button"
+                  @click="selectModel(preset.id, m.value)"
+                  style="
+                    display: flex; align-items: center; justify-content: space-between;
+                    width: 100%; padding: 5px 8px; border-radius: 7px; border: none;
+                    background: transparent; color: var(--text-2); font-size: 12px;
+                    cursor: pointer; text-align: left; transition: all 0.12s;
+                  "
+                  :style="ai.config.provider === preset.id && ai.config.model === m.value
+                    ? { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 500 }
+                    : {}"
+                  @mouseenter="$event.currentTarget.style.background = 'var(--surface-2)'"
+                  @mouseleave="$event.currentTarget.style.background = ai.config.provider === preset.id && ai.config.model === m.value ? 'var(--primary-light)' : 'transparent'"
+                >
+                  <span>{{ m.label }}</span>
+                  <svg v-if="ai.config.provider === preset.id && ai.config.model === m.value" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              </template>
+
+              <template v-if="ai.isProviderAuthenticated('custom')"
+              >
+                <div v-if="authenticatedPresetProviders.length > 0" style="height: 1px; background: var(--border-subtle); margin: 4px 6px" />
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-3); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.5px"
+              >自定义</div>
+                <button
+                  type="button"
+                  @click="selectModel('custom', ai.config.model)"
+                  style="
+                    display: flex; align-items: center; justify-content: space-between;
+                    width: 100%; padding: 5px 8px; border-radius: 7px; border: none;
+                    background: transparent; color: var(--text-2); font-size: 12px;
+                    cursor: pointer; text-align: left; transition: all 0.12s;
+                  "
+                  :style="ai.config.provider === 'custom'
+                    ? { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 500 }
+                    : {}"
+                  @mouseenter="$event.currentTarget.style.background = 'var(--surface-2)'"
+                  @mouseleave="$event.currentTarget.style.background = ai.config.provider === 'custom' ? 'var(--primary-light)' : 'transparent'"
+                >
+                  <span>{{ ai.config.model || '自定义模型' }}</span>
+                  <svg v-if="ai.config.provider === 'custom'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              </template>
+            </div>
+          </div>
+
           <input v-model="aiInput" type="text" placeholder="向 AI 助手提问…" class="ai-input" @keydown.enter="sendAIMessage(aiInput)" :disabled="ai.streaming || !ai.config.enabled" />
           <button type="button" class="btn-primary-sm" @click="sendAIMessage(aiInput)" :disabled="ai.streaming || !aiInput.trim() || !ai.config.enabled">发送</button>
           <button v-if="ai.streaming" type="button" class="btn-danger-sm" @click="ai.abortStream()">停止</button>

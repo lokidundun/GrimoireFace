@@ -255,6 +255,13 @@ onMounted(async () => {
   getCategoryMap().then((map) => {
     categoryMap.value = map
   })
+  const onCategoryUpdate = () => {
+    getCategoryMap().then((map) => {
+      categoryMap.value = map
+    })
+  }
+  window.addEventListener('grimoireface_category_map_updated', onCategoryUpdate)
+  onUnmounted(() => window.removeEventListener('grimoireface_category_map_updated', onCategoryUpdate))
 
   // Load notes and flags
   const loadMeta = async () => {

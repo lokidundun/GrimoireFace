@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { BUILTIN_CATEGORIES } from '@/lib/questionLoader'
+import { getBuiltinCategories, type BuiltinCategory } from '@/lib/db'
 
 const router = useRouter()
 
 const visible = ref(false)
 const step = ref(0)
+const builtinCategories = ref<BuiltinCategory[]>([])
+
+onMounted(async () => {
+  builtinCategories.value = await getBuiltinCategories()
+})
 
 const steps = [
   { id: 'welcome', label: '欢迎' },
@@ -91,7 +96,7 @@ function goToPractice() {
               <p class="text-sm text-[var(--text-2)] mb-4">选择你感兴趣的题库分类</p>
               <div class="grid grid-cols-2 gap-3">
                 <div
-                  v-for="cat in BUILTIN_CATEGORIES"
+                  v-for="cat in builtinCategories"
                   :key="cat.category"
                   class="p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]"
                 >

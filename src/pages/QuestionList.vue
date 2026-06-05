@@ -13,8 +13,6 @@ import { createPracticeSessionPath } from '@/lib/practiceSession'
 import { filterVisibleQuestions, getHiddenModules } from '@/lib/questionVisibility'
 import { useStudyStore } from '@/stores/useStudyStore'
 import {
-  BUILTIN_MODULE_CATEGORY,
-  BUILTIN_MODULES,
   DIFFICULTY_LABELS,
   DIFFICULTY_STYLES,
   type Difficulty,
@@ -38,12 +36,18 @@ const STATUS_VALUES = new Set<StudyStatus>(['unlearned', 'review', 'mastered'])
 const DIFFICULTY_VALUES = new Set<Difficulty>([1, 2, 3])
 const SORT_VALUES = new Set(['default', 'note-updated', 'difficulty-asc', 'difficulty-desc', 'module'])
 
-function parseListParam(value: string | string[] | undefined): string[] {
+function parseListParam(value: unknown): string[] {
   if (!value) return []
   if (Array.isArray(value)) {
-    return value.flatMap((v) => v.split(',')).map((v) => v.trim()).filter(Boolean)
+    return value
+      .flatMap((v) => (typeof v === 'string' ? v.split(',') : []))
+      .map((v) => v.trim())
+      .filter(Boolean)
   }
-  return value.split(',').map((v) => v.trim()).filter(Boolean)
+  if (typeof value === 'string') {
+    return value.split(',').map((v) => v.trim()).filter(Boolean)
+  }
+  return []
 }
 
 function uniqueValues<T>(values: T[]): T[] {
@@ -113,6 +117,23 @@ onMounted(() => {
   })
 })
 
+// Listen for category map changes from settings
+function onCategoryMapUpdated() {
+  getCategoryMap().then((m) => {
+    categoryMap.value = m
+  })
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('grimoireface_category_map_updated', onCategoryMapUpdated)
+}
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('grimoireface_category_map_updated', onCategoryMapUpdated)
+  }
+})
+
 const hiddenModules = computed(() =>
   getHiddenModules(categoryMap.value, studyStore.hiddenCategories),
 )
@@ -122,12 +143,48 @@ const visibleQuestions = computed(() =>
 
 const availableModules = computed<Module[]>(() => {
   const moduleSet = new Set(visibleQuestions.value.map((q) => q.module))
-  const builtins = (BUILTIN_MODULES as readonly string[]).filter((m) => moduleSet.has(m))
-  const custom = [...moduleSet]
-    .filter((m) => !(BUILTIN_MODULES as readonly string[]).includes(m))
-    .sort((a, b) => a.localeCompare(b))
-  return [...builtins, ...custom]
+  const modules = [...moduleSet]
+
+  // Build a map of module -> category order for sorting
+  const moduleOrder = new Map<string, number>()
+  const moduleCategory = new Map<string, string>()
+  for (const cat of Object.values(categoryMap.value)) {
+    for (let i = 0; i < cat.modules.length; i++) {
+      const m = cat.modules[i]
+      if (!moduleOrder.has(m)) {
+        moduleOrder.set(m, (cat.order ?? 0) * 1000 + i)
+        moduleCategory.set(m, cat.name)
+      }
+    }
+  }
+
+  modules.sort((a, b) => {
+    const orderA = moduleOrder.get(a)
+    const orderB = moduleOrder.get(b)
+    if (orderA !== undefined && orderB !== undefined) return orderA - orderB
+    if (orderA !== undefined) return -1
+    if (orderB !== undefined) return 1
+    return a.localeCompare(b)
+  })
+
+  return modules
 })
+
+/** Returns the category name for a module (from categoryMap), or null if uncategorized. */
+function getModuleCategoryLabel(mod: string): string | null {
+  for (const cat of Object.values(categoryMap.value)) {
+    if (cat.modules.includes(mod)) return cat.name
+  }
+  return null
+}
+
+/** Checks whether a module is present in any built-in category. */
+function isBuiltinModule(mod: string): boolean {
+  for (const cat of Object.values(DEFAULT_CATEGORY_MAP)) {
+    if (cat.modules.includes(mod)) return true
+  }
+  return false
+}
 
 // ─── Filter state ───────────────────────────────────────────────────────────────
 
@@ -1050,7 +1107,7 @@ function getStatus(qId: string): StudyStatus {
                 "
               >模块</p>
               <span
-                v-if="availableModules.some(m => !(BUILTIN_MODULES as readonly string[]).includes(m))"
+                v-if="availableModules.some(m => !isBuiltinModule(m))"
                 style="
                   font-size: 10px; padding: 1px 5px; border-radius: 4px;
                   background: var(--primary-light); color: var(--primary);
@@ -1090,16 +1147,16 @@ function getStatus(qId: string): StudyStatus {
               >
                 <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ mod }}</span>
                 <span
-                  v-if="BUILTIN_MODULE_CATEGORY[mod]"
+                  v-if="getModuleCategoryLabel(mod)"
                   :style="{
                     fontSize: '9px', padding: '1px 4px', borderRadius: '3px',
                     background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)',
                     color: selectedModules.includes(mod) ? 'rgba(255,255,255,0.8)' : 'var(--text-3)',
                     flexShrink: 0,
                   }"
-                >{{ BUILTIN_MODULE_CATEGORY[mod] }}</span>
+                >{{ getModuleCategoryLabel(mod) }}</span>
                 <span
-                  v-if="!(BUILTIN_MODULES as readonly string[]).includes(mod)"
+                  v-if="!isBuiltinModule(mod)"
                   :style="{
                     fontSize: '9px', padding: '1px 4px', borderRadius: '3px',
                     background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)',
@@ -1363,7 +1420,7 @@ function getStatus(qId: string): StudyStatus {
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px">
                   <p style="font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em">模块</p>
                   <span
-                    v-if="availableModules.some(m => !(BUILTIN_MODULES as readonly string[]).includes(m))"
+                    v-if="availableModules.some(m => !isBuiltinModule(m))"
                     style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: var(--primary-light); color: var(--primary); border: 1px solid rgba(var(--primary-rgb),0.2)"
                   >含自定义</span>
                 </div>
@@ -1381,8 +1438,8 @@ function getStatus(qId: string): StudyStatus {
                     }"
                   >
                     <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ mod }}</span>
-                    <span v-if="BUILTIN_MODULE_CATEGORY[mod]" :style="{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: selectedModules.includes(mod) ? 'rgba(255,255,255,0.8)' : 'var(--text-3)', flexShrink: 0 }">{{ BUILTIN_MODULE_CATEGORY[mod] }}</span>
-                    <span v-if="!(BUILTIN_MODULES as readonly string[]).includes(mod)" :style="{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: selectedModules.includes(mod) ? 'rgba(255,255,255,0.8)' : 'var(--text-3)', flexShrink: 0 }">自定义</span>
+                    <span v-if="getModuleCategoryLabel(mod)" :style="{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: selectedModules.includes(mod) ? 'rgba(255,255,255,0.8)' : 'var(--text-3)', flexShrink: 0 }">{{ getModuleCategoryLabel(mod) }}</span>
+                    <span v-if="!isBuiltinModule(mod)" :style="{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: selectedModules.includes(mod) ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: selectedModules.includes(mod) ? 'rgba(255,255,255,0.8)' : 'var(--text-3)', flexShrink: 0 }">自定义</span>
                     <svg v-if="selectedModules.includes(mod)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><polyline points="20 6 9 17 4 12" /></svg>
                   </button>
                 </div>

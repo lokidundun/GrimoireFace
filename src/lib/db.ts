@@ -220,6 +220,17 @@ export async function deleteQuestionById(id: string): Promise<void> {
   ])
 }
 
+export async function putQuestion(question: Question): Promise<void> {
+  const db = await getDB()
+  await db.put(STORES.QUESTIONS, question)
+}
+
+export async function questionExists(id: string): Promise<boolean> {
+  const db = await getDB()
+  const q = await db.get(STORES.QUESTIONS, id)
+  return q !== undefined
+}
+
 // ─── Study Records ────────────────────────────────────────────────────────────
 
 export async function getAllStudyRecords(): Promise<StudyRecord[]> {
@@ -612,7 +623,70 @@ export const META_KEYS = {
   BUILTIN_QUESTIONS_VERSION: 'builtin_questions_version',
   BUILTIN_REPLACEMENT_MIGRATION: 'builtin_replacement_migration',
   CATEGORY_MAP: 'category_map', // CategoryMap — user-defined category → modules mapping
+  BUILTIN_CATEGORIES: 'builtin_categories', // BuiltinCategory[] — user-managed built-in category → file paths
+  QUESTIONS_FOLDER_HANDLE: 'questions_folder_handle', // FileSystemDirectoryHandle | null
 } as const
+
+// ─── Built-in category config (moved from questionLoader.ts) ─────────────────
+
+export interface BuiltinCategory {
+  /** Display name — must match the key in DEFAULT_CATEGORY_MAP */
+  category: string
+  /** Paths relative to /public/questions/ */
+  files: string[]
+}
+
+export const DEFAULT_BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
+  {
+    category: '前端',
+    files: [
+      'frontend/js.json',
+      'frontend/react.json',
+      'frontend/vue.json',
+      'frontend/css.json',
+      'frontend/typescript.json',
+      'frontend/network.json',
+      'frontend/performance.json',
+      'frontend/algorithm.json',
+      'frontend/project.json',
+    ],
+  },
+  {
+    category: 'Golang',
+    files: [
+      'golang/basics.json',
+      'golang/concurrency.json',
+      'golang/memory.json',
+      'golang/engineering.json',
+      'golang/web.json',
+    ],
+  },
+  {
+    category: 'AI Agent',
+    files: [
+      'ai-agent/llm.json',
+      'ai-agent/prompt.json',
+      'ai-agent/agent.json',
+      'ai-agent/rag.json',
+      'ai-agent/tools.json',
+      'ai-agent/evaluation.json',
+      'ai-agent/engineering.json',
+      'ai-agent/application.json',
+    ],
+  },
+  {
+    category: 'Java',
+    files: [
+      'java/basics.json',
+      'java/concurrency.json',
+      'java/jvm.json',
+      'java/spring.json',
+      'java/network.json',
+      'java/mysql.json',
+      'java/redis.json',
+    ],
+  },
+] as const
 
 // ─── Default built-in category map ───────────────────────────────────────────
 
@@ -630,13 +704,13 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
       '手写题',
       '项目深挖',
     ],
-    builtin: true,
+    builtin: false,
     order: 0,
   },
   Golang: {
     name: 'Golang',
     modules: ['Go基础', '并发编程', '内存与GC', '工程化', 'Web开发'],
-    builtin: true,
+    builtin: false,
     order: 1,
   },
   'AI Agent': {
@@ -651,13 +725,13 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
       'AI工程化',
       'AI应用实践',
     ],
-    builtin: true,
+    builtin: false,
     order: 2,
   },
   Java: {
     name: 'Java',
     modules: ['Java基础', 'Java并发', 'JVM', 'Spring框架', '计算机网络', 'MySQL', 'Redis'],
-    builtin: true,
+    builtin: false,
     order: 3,
   },
 }
@@ -670,36 +744,16 @@ export async function getCategoryMap(): Promise<CategoryMap> {
   const stored = await getMeta<CategoryMap>(META_KEYS.CATEGORY_MAP)
   if (!stored || Object.keys(stored).length === 0) return { ...DEFAULT_CATEGORY_MAP }
 
-  const merged: CategoryMap = { ...DEFAULT_CATEGORY_MAP }
-
-  for (const [key, entry] of Object.entries(stored)) {
-    const builtin = DEFAULT_CATEGORY_MAP[key]
-
-    if (entry.builtin && LEGACY_JAVA_CATEGORY_NAMES.has(key)) {
-      continue
-    }
-
-    if (!builtin) {
-      merged[key] = entry
-      continue
-    }
-
-    const modules = [...builtin.modules]
-    for (const module of entry.modules) {
-      if (!modules.includes(module)) modules.push(module)
-    }
-
-    merged[key] = {
-      ...builtin,
-      modules,
-    }
-  }
-
-  return merged
+  // Return stored map as-is; do NOT merge back DEFAULT_CATEGORY_MAP.
+  // If a user deleted a default category, it stays deleted.
+  return { ...stored }
 }
 
 export async function saveCategoryMap(map: CategoryMap): Promise<void> {
   await setMeta(META_KEYS.CATEGORY_MAP, map)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('grimoireface_category_map_updated'))
+  }
 }
 
 /**
@@ -787,6 +841,66 @@ export async function renameCategory(oldName: string, newName: string): Promise<
   map[newName] = { ...map[oldName], name: newName }
   delete map[oldName]
   await saveCategoryMap(map)
+}
+
+/**
+ * Move a module from one category to another.
+ * If fromCategory is null, the module is only registered in the target category.
+ */
+export async function moveModuleToCategory(
+  moduleName: string,
+  fromCategory: string | null,
+  toCategory: string,
+): Promise<void> {
+  if (fromCategory === toCategory) return
+  const map = await getCategoryMap()
+
+  // Remove from source category
+  if (fromCategory && map[fromCategory]) {
+    const idx = map[fromCategory].modules.indexOf(moduleName)
+    if (idx !== -1) {
+      map[fromCategory].modules.splice(idx, 1)
+    }
+  }
+
+  // Ensure target category exists
+  if (!map[toCategory]) {
+    map[toCategory] = {
+      name: toCategory,
+      modules: [],
+      builtin: false,
+      order: Object.keys(map).length,
+    }
+  }
+
+  // Add to target category if not already there
+  if (!map[toCategory].modules.includes(moduleName)) {
+    map[toCategory].modules.push(moduleName)
+  }
+
+  await saveCategoryMap(map)
+}
+
+/**
+ * Reorder all categories by the given ordered names.
+ * Builtin and custom categories are reordered together.
+ */
+export async function reorderCategories(orderedNames: string[]): Promise<void> {
+  const map = await getCategoryMap()
+  const newMap: CategoryMap = {}
+  for (let i = 0; i < orderedNames.length; i++) {
+    const name = orderedNames[i]
+    if (map[name]) {
+      newMap[name] = { ...map[name], order: i }
+    }
+  }
+  // Preserve any categories not in the ordered list (append at end)
+  for (const [name, entry] of Object.entries(map)) {
+    if (!newMap[name]) {
+      newMap[name] = { ...entry, order: orderedNames.length + Object.keys(newMap).length }
+    }
+  }
+  await saveCategoryMap(newMap)
 }
 
 // ─── Module loader tracking ───────────────────────────────────────────────────
@@ -907,4 +1021,48 @@ export async function resetDatabase(): Promise<void> {
 export async function getActiveModules(): Promise<string[]> {
   const all = await getAllQuestions()
   return [...new Set(all.map((q) => q.module))]
+}
+
+// ─── Built-in categories CRUD ─────────────────────────────────────────────────
+
+export async function getBuiltinCategories(): Promise<BuiltinCategory[]> {
+  const stored = await getMeta<BuiltinCategory[]>(META_KEYS.BUILTIN_CATEGORIES)
+  // Only return defaults when never saved (undefined).
+  // If saved as empty array, respect it (user deleted all categories).
+  if (stored === undefined || stored === null) {
+    return [...DEFAULT_BUILTIN_CATEGORIES]
+  }
+  return stored
+}
+
+export async function saveBuiltinCategories(categories: BuiltinCategory[]): Promise<void> {
+  await setMeta(META_KEYS.BUILTIN_CATEGORIES, categories)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('grimoireface_category_map_updated'))
+  }
+}
+
+export async function addBuiltinCategory(category: BuiltinCategory): Promise<void> {
+  const current = await getBuiltinCategories()
+  if (current.some((c) => c.category === category.category)) {
+    throw new Error(`分类「${category.category}」已存在`)
+  }
+  await saveBuiltinCategories([...current, category])
+}
+
+export async function updateBuiltinCategory(
+  oldName: string,
+  category: BuiltinCategory,
+): Promise<void> {
+  const current = await getBuiltinCategories()
+  const idx = current.findIndex((c) => c.category === oldName)
+  if (idx === -1) throw new Error(`分类「${oldName}」不存在`)
+  current[idx] = category
+  await saveBuiltinCategories([...current])
+}
+
+export async function deleteBuiltinCategory(categoryName: string): Promise<void> {
+  const current = await getBuiltinCategories()
+  const filtered = current.filter((c) => c.category !== categoryName)
+  await saveBuiltinCategories(filtered)
 }

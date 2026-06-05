@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useQuestions } from '@/composables/useQuestions'
@@ -18,7 +18,7 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-const { allQuestions, initializing } = useQuestions()
+const { allQuestions, initializing, reload: reloadQuestions } = useQuestions()
 const studyStore = useStudyStore()
 const { records, hiddenCategories } = storeToRefs(studyStore)
 
@@ -44,7 +44,26 @@ watch(
 // Category map
 const categoryMap = ref<CategoryMap>({ ...DEFAULT_CATEGORY_MAP })
 onMounted(() => {
-  getCategoryMap().then((m) => { categoryMap.value = m })
+  getCategoryMap().then((m) => {
+    console.log('[Practice] onMounted categoryMap:', m)
+    categoryMap.value = m
+  })
+})
+
+async function onCategoryMapUpdated() {
+  await reloadQuestions()
+  const map = await getCategoryMap()
+  categoryMap.value = map
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('grimoireface_category_map_updated', onCategoryMapUpdated)
+}
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('grimoireface_category_map_updated', onCategoryMapUpdated)
+  }
 })
 
 const hiddenModules = computed(() => {
@@ -83,13 +102,14 @@ const categoriesWithModules = computed(() => {
       builtin: cat.builtin,
       modules: (cat.modules || []).filter((m: string) => activeSet.has(m)),
     }))
-    .filter((cat) => cat.modules.length > 0)
 
   const assignedModules = new Set(fromMap.flatMap((c) => c.modules))
   const uncategorized = activeModules.value.filter((m) => !assignedModules.has(m))
   if (uncategorized.length > 0) {
     fromMap.push({ name: '其他', builtin: false, modules: uncategorized })
   }
+  console.log('[Practice] categoryMap:', categoryMap.value)
+  console.log('[Practice] categoriesWithModules:', fromMap)
   return fromMap
 })
 
@@ -276,7 +296,7 @@ function diffChipColor(d: Difficulty | 'all', sel: boolean): string {
             <div style="display:flex;flex-direction:column;gap:20px">
               <div v-for="cat in categoriesWithModules" :key="cat.name">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                  <button type="button" @click="toggleCategory(cat.modules)"
+                  <button v-if="cat.modules.length > 0" type="button" @click="toggleCategory(cat.modules)"
                     :title="cat.modules.every(function(m: string) { return selectedModules.includes(m) }) ? '取消全选此分类' : '全选此分类'"
                     style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:0">
                     <span :style="{width:'14px',height:'14px',borderRadius:'4px',border:cat.modules.every(function(m: string) { return selectedModules.includes(m) })?'1.5px solid var(--primary)':cat.modules.some(function(m: string) { return selectedModules.includes(m) })?'1.5px solid var(--primary)':'1.5px solid var(--border)',background:cat.modules.every(function(m: string) { return selectedModules.includes(m) })?'var(--primary)':cat.modules.some(function(m: string) { return selectedModules.includes(m) })?'var(--primary-light)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.15s'}">
@@ -285,10 +305,11 @@ function diffChipColor(d: Difficulty | 'all', sel: boolean): string {
                     </span>
                     <span :style="{fontSize:'12px',fontWeight:700,color:cat.modules.some(function(m: string) { return selectedModules.includes(m) })?'var(--primary)':'var(--text-2)',letterSpacing:'0.04em',textTransform:'uppercase',transition:'color 0.15s'}">{{ cat.name }}</span>
                   </button>
-                  <span v-if="!cat.builtin" style="font-size:10px;font-weight:500;color:var(--text-3);background:var(--surface-3);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px">自定义</span>
-                  <span style="font-size:11px;color:var(--text-3)">{{ cat.modules.length }} 个模块 · {{ cat.modules.reduce(function(sum: number, m: string) { return sum + (moduleStats.find(function(s: any) { return s.module === m })?.total ?? 0) }, 0) }} 道题</span>
+                  <span v-else style="font-size:12px;font-weight:700;color:var(--text-2);letter-spacing:0.04em;text-transform:uppercase">{{ cat.name }}</span>
+                  <span v-if="cat.modules.length > 0" style="font-size:11px;color:var(--text-3)">{{ cat.modules.length }} 个模块 · {{ cat.modules.reduce(function(sum: number, m: string) { return sum + (moduleStats.find(function(s: any) { return s.module === m })?.total ?? 0) }, 0) }} 道题</span>
+                  <span v-else style="font-size:11px;color:var(--text-3)">0 个模块</span>
                 </div>
-                <div class="mg" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                <div v-if="cat.modules.length > 0" class="mg" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
                   <button v-for="mod in cat.modules" :key="mod" type="button" @click="toggleModule(mod)"
                     :style="{position:'relative',padding:'14px',borderRadius:'14px',border:selectedModules.includes(mod)?'1px solid rgba(var(--primary-rgb),0.5)':'1px solid var(--border-subtle)',background:selectedModules.includes(mod)?'var(--primary-light)':'var(--surface)',textAlign:'left',cursor:'pointer',boxShadow:selectedModules.includes(mod)?'none':'var(--shadow-xs)',transition:'border-color 0.15s, background 0.15s, box-shadow 0.15s'}">
                     <div v-if="selectedModules.includes(mod)" style="position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center">
@@ -301,6 +322,9 @@ function diffChipColor(d: Difficulty | 'all', sel: boolean): string {
                     </div>
                     <p style="font-size:10px;color:var(--text-3);margin-top:5px;font-variant-numeric:tabular-nums">{{ moduleStats.find(function(s: any) { return s.module === mod })?.mastered ?? 0 }}/{{ moduleStats.find(function(s: any) { return s.module === mod })?.total ?? 0 }} 已掌握</p>
                   </button>
+                </div>
+                <div v-else style="padding:16px;border-radius:12px;border:1px dashed var(--border);background:var(--surface);text-align:center;color:var(--text-3);font-size:13px">
+                  暂无模块，请在题库分类配置中上传 JSON 文件
                 </div>
               </div>
             </div>

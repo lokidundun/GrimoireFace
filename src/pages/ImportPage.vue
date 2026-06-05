@@ -12,8 +12,8 @@ import {
   unregisterModuleFromCategories,
 } from '@/lib/db'
 import {
-  BUILTIN_MODULE_FILES,
   BUILTIN_QUESTIONS_VERSION,
+  getBuiltinModuleFiles,
   importCustomQuestions,
   isJSONFile,
   isMDFile,
@@ -49,6 +49,7 @@ const pasteError = ref('')
 
 // Builtin library state
 const builtinCount = ref<number | null>(null)
+const builtinFileCount = ref<number | null>(null)
 const builtinLoading = ref(false)
 const builtinMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -56,6 +57,7 @@ const builtinMessage = ref<{ type: 'success' | 'error'; text: string } | null>(n
 onMounted(async () => {
   getCustomSources().then((s) => { customSources.value = s })
   refreshBuiltinStats()
+  getBuiltinModuleFiles().then((files) => { builtinFileCount.value = files.length })
 })
 
 async function refreshBuiltinStats() {
@@ -278,7 +280,7 @@ const schemaFields = [
         <div style="min-width: 0">
           <p style="font-size: 14px; font-weight: 600; color: var(--text)">内置题库</p>
           <p style="font-size: 12px; color: var(--text-3); line-height: 1.6; margin-top: 3px">
-            {{ builtinCount === null ? '正在读取本地题库状态…' : `本地已有 ${builtinCount!.toLocaleString()} 道内置题，覆盖 ${BUILTIN_MODULE_FILES.length} 个题库文件。` }}
+            {{ builtinCount === null ? '正在读取本地题库状态…' : `本地已有 ${builtinCount!.toLocaleString()} 道内置题，覆盖 ${builtinFileCount ?? 0} 个题库文件。` }}
           </p>
           <p style="font-size: 11px; color: var(--text-3); margin-top: 4px">
             题库版本：{{ BUILTIN_QUESTIONS_VERSION }}
@@ -644,7 +646,6 @@ const schemaFields = [
           style="display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-subtle)"
         >
           <span style="font-size: 13px; font-weight: 600; color: var(--text); min-width: 60px; flex-shrink: 0">{{ cat.name }}</span>
-          <span v-if="cat.builtin" style="font-size: 10px; font-weight: 500; color: var(--primary); background: var(--primary-light); border: 1px solid rgba(var(--primary-rgb),0.2); border-radius: 4px; padding: 1px 6px; flex-shrink: 0">内置</span>
           <div style="display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0">
             <span
               v-for="m in cat.modules"

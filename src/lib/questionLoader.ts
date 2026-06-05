@@ -7,6 +7,7 @@ import {
   bulkPutQuestionNotes,
   bulkPutQuestions,
   bulkPutStudyRecords,
+  type BuiltinCategory,
   type CategoryMap,
   DEFAULT_CATEGORY_MAP,
   deleteQuestionById,
@@ -15,6 +16,7 @@ import {
   getAllQuestionNotes,
   getAllQuestions,
   getAllStudyRecords,
+  getBuiltinCategories,
   getCustomSources,
   getLoadedModules,
   getMeta,
@@ -27,80 +29,15 @@ import {
   setMeta,
 } from './db'
 
-// ─── Built-in category → module files registry ────────────────────────────────
-//
-// Each entry maps a display category name to the list of JSON files
-// (relative to /public/questions/) that belong to it.
-//
-// Convention: files live under a subdirectory named after the category,
-// e.g. frontend/js.json, golang/basics.json
-//
-// To add a new built-in category (e.g. Golang), just append an entry here
-// and drop the JSON files in public/questions/<subdir>/.
-
-export interface BuiltinCategory {
-  /** Display name — must match the key in DEFAULT_CATEGORY_MAP in db.ts */
-  category: string
-  /** Paths relative to /public/questions/ */
-  files: readonly string[]
-}
-
-export const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
-  {
-    category: '前端',
-    files: [
-      'frontend/js.json',
-      'frontend/react.json',
-      'frontend/vue.json',
-      'frontend/css.json',
-      'frontend/typescript.json',
-      'frontend/network.json',
-      'frontend/performance.json',
-      'frontend/algorithm.json',
-      'frontend/project.json',
-    ],
-  },
-  // ── Add new built-in categories below ──────────────────────────────────
-  {
-    category: 'Golang',
-    files: [
-      'golang/basics.json',
-      'golang/concurrency.json',
-      'golang/memory.json',
-      'golang/engineering.json',
-      'golang/web.json',
-    ],
-  },
-  {
-    category: 'AI Agent',
-    files: [
-      'ai-agent/llm.json',
-      'ai-agent/prompt.json',
-      'ai-agent/agent.json',
-      'ai-agent/rag.json',
-      'ai-agent/tools.json',
-      'ai-agent/evaluation.json',
-      'ai-agent/engineering.json',
-      'ai-agent/application.json',
-    ],
-  },
-  {
-    category: 'Java',
-    files: [
-      'java/basics.json',
-      'java/concurrency.json',
-      'java/jvm.json',
-      'java/spring.json',
-      'java/network.json',
-      'java/mysql.json',
-      'java/redis.json',
-    ],
-  },
-] as const
-
-/** Flat list of every built-in file path across all categories (for legacy compat). */
-export const BUILTIN_MODULE_FILES: readonly string[] = BUILTIN_CATEGORIES.flatMap((c) => c.files)
+export type { BuiltinCategory }
+export { getBuiltinCategories }
 export const BUILTIN_QUESTIONS_VERSION = '0.18.0'
+
+/** Get flat list of every built-in file path across all categories. */
+export async function getBuiltinModuleFiles(): Promise<string[]> {
+  const categories = await getBuiltinCategories()
+  return categories.flatMap((c) => c.files)
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,6 +46,7 @@ interface LoadResult {
   loaded: number
   skipped: number
   errors: { index: number; message: string }[]
+  modules?: string[]
 }
 
 // ─── Fetch + validate + persist a single JSON file ───────────────────────────
@@ -142,12 +80,14 @@ export async function loadModuleFile(file: string, force = false): Promise<LoadR
 
   const { valid, errors } = validateQuestions(raw)
 
+  const modules = [...new Set(valid.map((q) => q.module as string))]
+
   if (alreadyLoaded && valid.length > 0) {
     // Incremental check: compare count by module key
     const moduleKey = valid[0].module as string
     const existing = await getQuestionsByModule(moduleKey)
     if (valid.length <= existing.length) {
-      return { file, loaded: 0, skipped: 0, errors }
+      return { file, loaded: 0, skipped: 0, errors, modules }
     }
     await bulkPutQuestions(valid as Question[])
     return {
@@ -155,6 +95,7 @@ export async function loadModuleFile(file: string, force = false): Promise<LoadR
       loaded: valid.length - existing.length,
       skipped: Array.isArray(raw) ? (raw as unknown[]).length - valid.length : 0,
       errors,
+      modules,
     }
   }
 
@@ -170,6 +111,7 @@ export async function loadModuleFile(file: string, force = false): Promise<LoadR
     loaded: valid.length,
     skipped: Array.isArray(raw) ? (raw as unknown[]).length - valid.length : 0,
     errors,
+    modules,
   }
 }
 
@@ -185,16 +127,45 @@ export async function loadCategoryFiles(
     const result = await loadModuleFile(category.files[i])
     results.push(result)
   }
-  // Register the modules that actually loaded under the category name
-  const loadedModules = results.filter((r) => r.loaded > 0 || r.skipped === 0).map((r) => r.file)
-  if (loadedModules.length > 0) {
-    // We need the actual module names from the DB — they come from the JSON,
-    // not the file path, so we derive them from the loaded questions.
-    // registerModulesInCategory is called inside loadModuleFile indirectly
-    // via the category seeding in db.ts DEFAULT_CATEGORY_MAP; here we just
-    // ensure every successfully-fetched module is linked.
+  // Auto-register discovered modules to the category
+  const allModules = results.flatMap((r) => r.modules ?? [])
+  const uniqueModules = [...new Set(allModules)]
+  if (uniqueModules.length > 0) {
+    await registerModulesInCategory(category.category, uniqueModules)
   }
   return results
+}
+
+/** Build a reverse map from file path to category name from current categories. */
+async function _buildFileToCategory(): Promise<Map<string, string>> {
+  const categories = await getBuiltinCategories()
+  const map = new Map<string, string>()
+  for (const cat of categories) {
+    for (const file of cat.files) {
+      map.set(file, cat.category)
+    }
+  }
+  return map
+}
+
+/** Auto-register modules from load results into their respective categories. */
+async function _registerResultsToCategories(results: LoadResult[]): Promise<void> {
+  const fileToCategory = await _buildFileToCategory()
+  const byCategory = new Map<string, string[]>()
+  for (const result of results) {
+    const category = fileToCategory.get(result.file)
+    if (!category || !result.modules || result.modules.length === 0) continue
+    const list = byCategory.get(category) ?? []
+    for (const m of result.modules) {
+      if (!list.includes(m)) list.push(m)
+    }
+    byCategory.set(category, list)
+  }
+  for (const [category, modules] of byCategory) {
+    if (modules.length > 0) {
+      await registerModulesInCategory(category, modules)
+    }
+  }
 }
 
 // ─── Load all built-in modules sequentially (with progress callback) ─────────
@@ -202,12 +173,13 @@ export async function loadCategoryFiles(
 export async function loadAllBuiltinModules(
   onProgress?: (file: string, index: number, total: number) => void,
 ): Promise<LoadResult[]> {
-  const allFiles = BUILTIN_MODULE_FILES
+  const allFiles = await getBuiltinModuleFiles()
   const results: LoadResult[] = []
   for (let i = 0; i < allFiles.length; i++) {
     onProgress?.(allFiles[i], i, allFiles.length)
     results.push(await loadModuleFile(allFiles[i]))
   }
+  await _registerResultsToCategories(results)
   return results
 }
 
@@ -483,14 +455,16 @@ export async function migrateBuiltinQuestionReplacements(): Promise<BuiltinRepla
 // ─── Load all built-in modules in parallel (faster initial load) ──────────────
 
 export async function loadAllBuiltinModulesParallel(force = false): Promise<LoadResult[]> {
-  const results = await Promise.all(BUILTIN_MODULE_FILES.map((f) => loadModuleFile(f, force)))
+  const allFiles = await getBuiltinModuleFiles()
+  const results = await Promise.all(allFiles.map((f) => loadModuleFile(f, force)))
+  await _registerResultsToCategories(results)
   const hasLoadFailure = results.some((result) =>
     result.errors.some((error) => error.index === -1 && result.loaded === 0),
   )
   if (!hasLoadFailure) {
     await migrateBuiltinQuestionReplacements()
     const loadedModules = new Set(await getLoadedModules())
-    for (const file of BUILTIN_MODULE_FILES) {
+    for (const file of allFiles) {
       loadedModules.add(file)
     }
     await setMeta(META_KEYS.LOADED_MODULES, [...loadedModules])
@@ -565,6 +539,56 @@ function _deriveCategory(sourceName: string): string {
     .replace(/[-_]/g, ' ')
     .trim()
   return base.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// ─── Import a local JSON File into a built-in category ────────────────────────
+
+export async function importBuiltinCategoryFile(
+  file: File,
+  categoryName: string,
+): Promise<LoadResult> {
+  if (!isJSONFile(file)) {
+    return {
+      file: file.name,
+      loaded: 0,
+      skipped: 0,
+      errors: [{ index: -1, message: '只支持 JSON 文件' }],
+    }
+  }
+
+  let raw: unknown
+  try {
+    const text = await file.text()
+    raw = JSON.parse(text)
+  } catch (err) {
+    return {
+      file: file.name,
+      loaded: 0,
+      skipped: 0,
+      errors: [{ index: -1, message: `JSON 解析失败：${String(err)}` }],
+    }
+  }
+
+  const { valid, errors } = validateQuestions(normalizeQuestionsForImport(raw))
+
+  if (valid.length === 0) {
+    return { file: file.name, loaded: 0, skipped: 0, errors }
+  }
+
+  await bulkPutQuestions(valid as Question[])
+
+  const modules = [...new Set(valid.map((q) => q.module as string))]
+  if (modules.length > 0) {
+    await registerModulesInCategory(categoryName, modules)
+  }
+
+  return {
+    file: file.name,
+    loaded: valid.length,
+    skipped: Array.isArray(raw) ? (raw as unknown[]).length - valid.length : 0,
+    errors,
+    modules,
+  }
 }
 
 // ─── Parse JSON string safely ─────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { useRouter, RouterLink } from 'vue-router'
 import { useStudyStore } from '@/stores/useStudyStore'
 import { useQuestions } from '@/composables/useQuestions'
 import { createPracticeSessionPath, getInlinePracticeSearch } from '@/lib/practiceSession'
-import { DIFFICULTY_LABELS, DIFFICULTY_COLORS, MODULE_LIST, type Difficulty, type Module } from '@/types'
+import { DIFFICULTY_LABELS, DIFFICULTY_COLORS, type Module } from '@/types'
 
 const router = useRouter()
 const { allQuestions, initializing } = useQuestions()
@@ -90,7 +90,10 @@ const displayItems = computed(() => {
 
 const sessionIds = computed(() => displayItems.value.map(({ question: q }) => q.id))
 
-const moduleList = computed(() => MODULE_LIST.filter((m) => (weakByModule.value[m] ?? 0) > 0))
+const moduleList = computed(() => {
+  const allModules = [...new Set(allQuestions.value.map((q) => q.module))]
+  return allModules.filter((m) => (weakByModule.value[m] ?? 0) > 0)
+})
 
 watch(selectedModule, () => {})
 
