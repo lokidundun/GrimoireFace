@@ -675,6 +675,7 @@ function handleMdDownload() {
 <template>
   <div class="page-container prompt-page">
     <!-- Header -->
+    <RouterLink to="/tools" class="back-link" style="margin-bottom:16px">← 返回工具</RouterLink>
     <div style="margin-bottom: 24px">
       <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
         <div>

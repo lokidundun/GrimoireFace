@@ -305,6 +305,7 @@ async function handleCopy() {
   <!-- Valid tool -->
   <template v-else>
     <div class="page-container ai-tool-page">
+      <RouterLink to="/tools" class="back-link" style="display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--text-2);text-decoration:none;margin-bottom:16px">← 返回工具</RouterLink>
       <div class="animate-fade-in" style="margin-bottom: 28px">
         <h1 style="font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px">
           {{ tool.title }}

@@ -375,12 +375,12 @@ export const MODULE_COLORS: Record<string, string> = {
 
 // Stable hash-based color palette for unknown modules
 const _paletteColors = [
-  '#6366f1',
-  '#8b5cf6',
+  '#ea580c',
+  '#d97706',
   '#ec4899',
   '#f59e0b',
-  '#10b981',
-  '#3b82f6',
+  '#059669',
+  '#dc2626',
   '#14b8a6',
   '#f97316',
   '#84cc16',

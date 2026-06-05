@@ -99,9 +99,9 @@ const allHidden = computed(
 const streakMilestone = computed(() => {
   const s = study.streak.currentStreak
   if (s >= 50) return { emoji: '🏆', msg: '史诗级连击！你已经达到传说级别！', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.18)' }
-  if (s >= 20) return { emoji: '👑', msg: '王者连击！专注力惊人！', color: '#6366f1', bg: 'rgba(99,102,241,0.06)', border: 'rgba(99,102,241,0.18)' }
-  if (s >= 10) return { emoji: '🚀', msg: '10 连击！你已进入深度专注状态！', color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.18)' }
-  if (s >= 5) return { emoji: '⚡', msg: '5 连击！手感火热，继续冲！', color: '#6366f1', bg: 'rgba(99,102,241,0.06)', border: 'rgba(99,102,241,0.18)' }
+  if (s >= 20) return { emoji: '👑', msg: '王者连击！专注力惊人！', color: '#ea580c', bg: 'rgba(234,88,12,0.06)', border: 'rgba(234,88,12,0.18)' }
+  if (s >= 10) return { emoji: '🚀', msg: '10 连击！你已进入深度专注状态！', color: '#059669', bg: 'rgba(5,150,105,0.06)', border: 'rgba(5,150,105,0.18)' }
+  if (s >= 5) return { emoji: '⚡', msg: '5 连击！手感火热，继续冲！', color: '#ea580c', bg: 'rgba(234,88,12,0.06)', border: 'rgba(234,88,12,0.18)' }
   if (s >= 3) return { emoji: '🔥', msg: '连击开启！越刷越顺！', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.18)' }
   if (s >= 1) return { emoji: '✅', msg: '今日已作答，坚持就是胜利！', color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.18)' }
   return null

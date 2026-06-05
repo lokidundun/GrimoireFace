@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useQuestions } from '@/composables/useQuestions'
 import {
@@ -145,7 +145,6 @@ const questionNotes = ref<QuestionNote[]>([])
 
 const searchRef = ref<HTMLInputElement | null>(null)
 const mobileFilterPanelRef = ref<HTMLDivElement | null>(null)
-const loaderRef = ref<HTMLDivElement | null>(null)
 const mobileFilterButtonRef = ref<HTMLButtonElement | null>(null)
 let lastSyncedSearch = route.fullPath
 
@@ -491,29 +490,47 @@ function handleStartFilteredSession() {
 
 // ─── Pagination ─────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 30
+const PAGE_SIZE_KEY = 'grimoireface_questionlist_page_size'
+const PAGE_SIZE_MIN = 5
+const PAGE_SIZE_MAX = 200
 
-const pagedQuestions = computed(() =>
-  filteredQuestions.value.slice(0, page.value * PAGE_SIZE),
-)
-const hasMore = computed(() => pagedQuestions.value.length < filteredQuestions.value.length)
+function loadPageSize(): number {
+  try {
+    const v = localStorage.getItem(PAGE_SIZE_KEY)
+    if (v) {
+      const n = parseInt(v, 10)
+      if (!Number.isNaN(n) && n >= PAGE_SIZE_MIN && n <= PAGE_SIZE_MAX) return n
+    }
+  } catch {}
+  return 30
+}
 
-// Infinite scroll
-onMounted(() => {
-  watch(hasMore, (val) => {
-    if (!val) return
-    nextTick(() => {
-      if (!loaderRef.value) return
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting) page.value++
-        },
-        { threshold: 0.1 },
-      )
-      observer.observe(loaderRef.value)
-      onUnmounted(() => observer.disconnect())
-    })
-  }, { immediate: true })
+function savePageSize(n: number): void {
+  try { localStorage.setItem(PAGE_SIZE_KEY, String(n)) } catch {}
+}
+
+const pageSize = ref(loadPageSize())
+
+function setPageSize(n: number) {
+  const clamped = Math.max(PAGE_SIZE_MIN, Math.min(PAGE_SIZE_MAX, Math.round(n)))
+  pageSize.value = clamped
+  savePageSize(clamped)
+  page.value = 1
+}
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredQuestions.value.length / pageSize.value)))
+
+const pagedQuestions = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredQuestions.value.slice(start, start + pageSize.value)
+})
+
+const hasMore = computed(() => page.value < totalPages.value)
+
+// Reset to page 1 when filters change (page already resets in toggle* handlers)
+// Scroll to top when page changes
+watch(page, () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 })
 
 // Keep selectedModules valid when availableModules changes
@@ -799,7 +816,7 @@ function getStatus(qId: string): StudyStatus {
         style="
           display: flex; align-items: center; gap: 4px;
           padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 500;
-          background: rgba(99,102,241,0.08); color: var(--primary);
+          background: rgba(var(--primary-rgb), 0.08); color: var(--primary);
           border: 1px solid rgba(var(--primary-rgb), 0.18);
           cursor: pointer; transition: all 0.12s;
         "
@@ -1563,7 +1580,7 @@ function getStatus(qId: string): StudyStatus {
                     display: inline-flex; align-items: center; gap: 4px;
                     font-size: 11px; font-weight: 500;
                     padding: 1px 7px; border-radius: 5px;
-                    background: rgba(99,102,241,0.08); color: var(--primary);
+                    background: rgba(var(--primary-rgb), 0.08); color: var(--primary);
                     border: 1px solid rgba(var(--primary-rgb), 0.18);
                   "
                 >
@@ -1623,27 +1640,113 @@ function getStatus(qId: string): StudyStatus {
             </svg>
           </RouterLink>
 
-          <!-- Infinite scroll loader -->
-          <div v-if="hasMore" ref="loaderRef" style="padding-top: 12px">
-            <div style="display: flex; flex-direction: column; gap: 6px">
-              <div
-                v-for="i in 3" :key="i"
-                class="card"
-                style="padding: 14px 16px; display: flex; align-items: flex-start; gap: 14px"
-              >
-                <div class="skeleton" style="width:3px;height:48px;border-radius:4px" :style="{ background: 'var(--surface-3)', animation: 'skeleton-pulse 1.6s var(--ease-in-out) infinite' }" />
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
-                  <div class="skeleton" style="width:70%;height:13px;border-radius:4px" :style="{ background: 'var(--surface-3)', animation: 'skeleton-pulse 1.6s var(--ease-in-out) infinite' }" />
-                  <div class="skeleton" style="width:40%;height:11px;border-radius:4px" :style="{ background: 'var(--surface-3)', animation: 'skeleton-pulse 1.6s var(--ease-in-out) infinite' }" />
-                </div>
-              </div>
+          <!-- Pagination -->
+          <div
+            v-if="totalPages > 1 || filteredQuestions.length > 10"
+            style="
+              display: flex; align-items: center; justify-content: space-between;
+              padding-top: 16px; gap: 12px; flex-wrap: wrap;
+            "
+          >
+            <!-- Page size selector -->
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3)">
+              <span style="white-space: nowrap">每页</span>
+              <input
+                type="number"
+                :value="pageSize"
+                @change="setPageSize(parseInt(($event.target as HTMLInputElement).value, 10) || 30)"
+                :min="PAGE_SIZE_MIN"
+                :max="PAGE_SIZE_MAX"
+                style="
+                  width: 48px; padding: 3px 6px; border-radius: 6px;
+                  border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text); font-size: 12px; text-align: center;
+                  outline: none; font-variant-numeric: tabular-nums;
+                "
+              />
+              <span style="white-space: nowrap">道</span>
             </div>
-          </div>
 
-          <p
-            v-if="!hasMore && filteredQuestions.length > PAGE_SIZE"
-            style="text-align: center; font-size: 12px; color: var(--text-3); padding-top: 16px"
-          >已显示全部 {{ filteredQuestions.length }} 道题</p>
+            <!-- Page navigation -->
+            <div style="display: flex; align-items: center; gap: 4px">
+              <button
+                type="button"
+                :disabled="page <= 1"
+                @click="page = 1"
+                style="
+                  padding: 4px 8px; border-radius: 6px;
+                  border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text-2); font-size: 12px; cursor: pointer;
+                  transition: all 0.12s;
+                "
+                :style="{ opacity: page <= 1 ? 0.4 : 1, pointerEvents: page <= 1 ? 'none' : 'auto' }"
+                title="首页"
+              >«</button>
+              <button
+                type="button"
+                :disabled="page <= 1"
+                @click="page--"
+                style="
+                  padding: 4px 10px; border-radius: 6px;
+                  border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text-2); font-size: 12px; cursor: pointer;
+                  transition: all 0.12s;
+                "
+                :style="{ opacity: page <= 1 ? 0.4 : 1, pointerEvents: page <= 1 ? 'none' : 'auto' }"
+              >← 上一页</button>
+
+              <template v-for="pg in totalPages" :key="pg">
+                <button
+                  v-if="pg === 1 || pg === totalPages || (pg >= page - 2 && pg <= page + 2)"
+                  type="button"
+                  @click="page = pg"
+                  :style="{
+                    minWidth: '28px', padding: '4px 8px', borderRadius: '6px',
+                    border: page === pg ? '1px solid var(--primary)' : '1px solid transparent',
+                    background: page === pg ? 'var(--primary-light)' : 'transparent',
+                    color: page === pg ? 'var(--primary)' : 'var(--text-2)',
+                    fontSize: '12px', fontWeight: page === pg ? 600 : 400,
+                    cursor: 'pointer', transition: 'all 0.12s',
+                  }"
+                >{{ pg }}</button>
+                <span
+                  v-else-if="pg === page - 3 || pg === page + 3"
+                  style="font-size: 12px; color: var(--text-3); padding: 0 2px"
+                >…</span>
+              </template>
+
+              <button
+                type="button"
+                :disabled="page >= totalPages"
+                @click="page++"
+                style="
+                  padding: 4px 10px; border-radius: 6px;
+                  border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text-2); font-size: 12px; cursor: pointer;
+                  transition: all 0.12s;
+                "
+                :style="{ opacity: page >= totalPages ? 0.4 : 1, pointerEvents: page >= totalPages ? 'none' : 'auto' }"
+              >下一页 →</button>
+              <button
+                type="button"
+                :disabled="page >= totalPages"
+                @click="page = totalPages"
+                style="
+                  padding: 4px 8px; border-radius: 6px;
+                  border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text-2); font-size: 12px; cursor: pointer;
+                  transition: all 0.12s;
+                "
+                :style="{ opacity: page >= totalPages ? 0.4 : 1, pointerEvents: page >= totalPages ? 'none' : 'auto' }"
+                title="末页"
+              >»</button>
+            </div>
+
+            <!-- Summary -->
+            <span style="font-size: 11px; color: var(--text-3); white-space: nowrap">
+              第 {{ filteredQuestions.length === 0 ? 0 : page }}/{{ totalPages }} 页，共 {{ filteredQuestions.length }} 道
+            </span>
+          </div>
         </div>
       </div>
     </div>

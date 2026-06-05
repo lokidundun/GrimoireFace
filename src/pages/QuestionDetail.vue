@@ -399,8 +399,12 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
 <template>
   <div class="page-container" style="max-width: 760px; display: flex; flex-direction: column; gap: 16px">
-    <!-- Breadcrumb -->
+    <!-- Back link -->
     <div class="animate-fade-in" v-if="!loading">
+      <RouterLink to="/questions" class="back-link">← 题库</RouterLink>
+    </div>
+    <!-- Breadcrumb -->
+    <div v-if="!loading">
       <nav v-if="!isInSession" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-3)">
         <RouterLink to="/questions" style="color: var(--text-3); text-decoration: none">题库</RouterLink>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.4"><polyline points="9 18 15 12 9 6"/></svg>

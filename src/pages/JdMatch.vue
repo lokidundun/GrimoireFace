@@ -292,6 +292,7 @@ async function handleCopyReport() {
 
 <template>
   <div class="page-container jd-match-page">
+    <RouterLink to="/tools" class="back-link" style="display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--text-2);text-decoration:none;margin-bottom:16px">← 返回工具</RouterLink>
     <div class="animate-fade-in" style="margin-bottom: 28px">
       <h1
         style="

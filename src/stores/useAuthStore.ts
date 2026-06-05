@@ -63,7 +63,11 @@ export function buildGitHubOAuthUrl(): string {
   try {
     sessionStorage.setItem('grimoireface_oauth_state', state)
   } catch {}
-  const params = new URLSearchParams({ client_id: clientId, scope: 'gist', state })
+  const params = new URLSearchParams({
+    client_id: clientId,
+    scope: 'gist',
+    state,
+  })
   return `https://github.com/login/oauth/authorize?${params.toString()}`
 }
 
@@ -81,6 +85,26 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function init() {
     if (initialized.value) return
+
+    // Always check OAuth callback first — token arrives via URL hash after
+    // the backend proxy exchanges the code.
+    const hashToken = handleOAuthCallback()
+    if (hashToken) {
+      // OAuth callback provided a fresh token — use it directly
+      token.value = hashToken
+      loading.value = true
+      try {
+        user.value = await fetchGitHubUser(hashToken)
+      } catch {
+        token.value = null
+        clearToken()
+      } finally {
+        loading.value = false
+        initialized.value = true
+      }
+      return
+    }
+
     const stored = loadToken()
     if (!stored) {
       initialized.value = true
@@ -97,18 +121,16 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = false
       initialized.value = true
     }
-
-    // Handle OAuth callback from URL hash
-    handleOAuthCallback()
   }
 
-  function handleOAuthCallback() {
+  /** Extracts token from URL hash. Returns the token string if found, null otherwise. */
+  function handleOAuthCallback(): string | null {
     const hash = window.location.hash
-    if (!hash.includes('token=')) return
+    if (!hash.includes('token=')) return null
 
     const params = new URLSearchParams(hash.slice(1))
     const newToken = params.get('token')
-    if (!newToken) return
+    if (!newToken) return null
 
     const returnedState = params.get('state')
     const savedState = (() => {
@@ -121,7 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (savedState && returnedState && savedState !== returnedState) {
       console.warn('[auth] OAuth state mismatch — possible CSRF, ignoring token')
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
-      return
+      return null
     }
     try {
       sessionStorage.removeItem('grimoireface_oauth_state')
@@ -130,16 +152,7 @@ export const useAuthStore = defineStore('auth', () => {
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
 
     saveToken(newToken)
-    token.value = newToken
-
-    fetchGitHubUser(newToken)
-      .then((u) => {
-        user.value = u
-      })
-      .catch(() => {
-        clearToken()
-        token.value = null
-      })
+    return newToken
   }
 
   // ── Actions ──

@@ -13,35 +13,35 @@
   --font-mono: "SF Mono", ui-monospace, "Cascadia Code", "Fira Code", Menlo, Courier, monospace;
   --control-font-size: 13px;
 
-  /* Brand */
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-rgb: 99, 102, 241;
-  --primary-light: rgba(99, 102, 241, 0.08);
-  --primary-light-hover: rgba(99, 102, 241, 0.14);
+  /* Brand — warm orange / Claude-style */
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --primary-rgb: 234, 88, 12;
+  --primary-light: rgba(234, 88, 12, 0.08);
+  --primary-light-hover: rgba(234, 88, 12, 0.14);
 
-  /* Surface */
-  --surface: #ffffff;
-  --surface-2: #f8f8fa;
-  --surface-3: #f1f1f5;
-  --surface-glass: rgba(255, 255, 255, 0.82);
+  /* Surface — cream / warm paper */
+  --surface: #fefdfb;
+  --surface-2: #faf6f1;
+  --surface-3: #f5f0e8;
+  --surface-glass: rgba(254, 253, 251, 0.86);
 
   /* Border */
-  --border: #e4e4e9;
-  --border-subtle: #ededf2;
+  --border: #e8e0d5;
+  --border-subtle: #f0eae0;
 
   /* Text */
-  --text: #111118;
-  --text-2: #52525e;
-  --text-3: #8b8b99;
+  --text: #2d2416;
+  --text-2: #6b5d4d;
+  --text-3: #9c8e7e;
 
   /* Status */
-  --success: #10b981;
-  --success-light: rgba(16, 185, 129, 0.1);
-  --warning: #f59e0b;
-  --warning-light: rgba(245, 158, 11, 0.1);
-  --danger: #ef4444;
-  --danger-light: rgba(239, 68, 68, 0.1);
+  --success: #059669;
+  --success-light: rgba(5, 150, 105, 0.1);
+  --warning: #d97706;
+  --warning-light: rgba(217, 119, 6, 0.1);
+  --danger: #dc2626;
+  --danger-light: rgba(220, 38, 38, 0.1);
 
   /* Shadow */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -96,23 +96,23 @@
 /* ─── Dark Mode ─────────────────────────────────────────────────────────────── */
 
 .dark {
-  --primary: #818cf8;
-  --primary-hover: #6366f1;
-  --primary-rgb: 129, 140, 248;
-  --primary-light: rgba(129, 140, 248, 0.1);
-  --primary-light-hover: rgba(129, 140, 248, 0.16);
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --primary-rgb: 249, 115, 22;
+  --primary-light: rgba(249, 115, 22, 0.12);
+  --primary-light-hover: rgba(249, 115, 22, 0.18);
 
-  --surface: #0f0f13;
-  --surface-2: #16161d;
-  --surface-3: #1e1e27;
-  --surface-glass: rgba(15, 15, 19, 0.82);
+  --surface: #1c1915;
+  --surface-2: #24201b;
+  --surface-3: #2d2923;
+  --surface-glass: rgba(28, 25, 21, 0.84);
 
-  --border: #2a2a36;
-  --border-subtle: #222230;
+  --border: #3d3830;
+  --border-subtle: #2e2a24;
 
-  --text: #f0f0f5;
-  --text-2: #9191a4;
-  --text-3: #5a5a6e;
+  --text: #f5f0e8;
+  --text-2: #a89c8c;
+  --text-3: #6b5f52;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03);
@@ -704,6 +704,19 @@ body {
 }
 
 /* ─── Page layout ───────────────────────────────────────────────────────────── */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.back-link:hover {
+  color: var(--primary);
+}
 
 .page-container {
   max-width: 1100px;

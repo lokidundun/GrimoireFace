@@ -468,15 +468,17 @@ function scoreVariant(score: number | null): string {
 <template>
   <div class="page-container mock-page" :class="{ 'has-active-session': activeSession }">
     <!-- Header -->
-    <div class="animate-fade-in" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 28px">
-      <div>
-        <h1 style="font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px">
-          模拟面试
-        </h1>
-        <p style="font-size: 13px; color: var(--text-3)">
-          基于岗位 JD 和简历进行一问一答，结束后查看评分与改进建议
-        </p>
-      </div>
+    <div class="animate-fade-in" style="margin-bottom: 28px">
+      <RouterLink to="/tools" class="back-link" style="display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--text-2);text-decoration:none;margin-bottom:16px">← 返回工具</RouterLink>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
+        <div>
+          <h1 style="font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px">
+            模拟面试
+          </h1>
+          <p style="font-size: 13px; color: var(--text-3)">
+            基于岗位 JD 和简历进行一问一答，结束后查看评分与改进建议
+          </p>
+        </div>
       <button
         v-if="!aiReady"
         type="button"
@@ -485,6 +487,7 @@ function scoreVariant(score: number | null): string {
       >
         配置 AI
       </button>
+      </div>
     </div>
 
     <!-- Error -->

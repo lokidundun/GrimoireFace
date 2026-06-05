@@ -4,17 +4,9 @@ import { useRouter } from 'vue-router'
 import { BUILTIN_CATEGORIES } from '@/lib/questionLoader'
 
 const router = useRouter()
-const ONBOARDING_DONE_KEY = 'grimoireface_onboarding_done_v1'
 
 const visible = ref(false)
 const step = ref(0)
-
-// Check if onboarding has been completed
-try {
-  if (localStorage.getItem(ONBOARDING_DONE_KEY) !== '1') {
-    visible.value = true
-  }
-} catch {}
 
 const steps = [
   { id: 'welcome', label: '欢迎' },
