@@ -40,6 +40,37 @@ async function parseErrorMessage(response: Response): Promise<string> {
   }
 }
 
+export async function requestChatCompletion({
+  config,
+  messages,
+  signal,
+  fetchFn = fetch,
+}: Omit<RequestChatCompletionStreamOptions, 'onDelta'>): Promise<string> {
+  const cleanApiKey = config.apiKey.replace(/[\x00-\x1F\x7F]/g, '')
+  const response = await fetchFn(buildChatCompletionsUrl(config.baseUrl), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${cleanApiKey}`,
+    },
+    signal,
+    body: JSON.stringify({
+      model: config.model,
+      messages,
+      temperature: config.temperature,
+      max_tokens: config.maxTokens,
+      stream: false,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response))
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content ?? ''
+}
+
 export async function requestChatCompletionStream({
   config,
   messages,

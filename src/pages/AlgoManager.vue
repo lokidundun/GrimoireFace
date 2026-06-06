@@ -4,10 +4,17 @@ import { useRouter } from 'vue-router'
 import { useAlgoProblems } from '@/composables/useAlgoProblems'
 import { importAlgoProblems, validateAlgoProblems } from '@/lib/algoProblemLoader'
 import { deleteAlgoProblemById, putAlgoProblem } from '@/lib/db'
+import { requestChatCompletion } from '@/lib/aiClient'
+import { useAIStore } from '@/stores/useAIStore'
+import { getAIProviderPreset } from '@/stores/aiPresets'
 import { DIFFICULTY_LABELS, type AlgoProblem, type AlgoSample, type AlgoTestCase } from '@/types'
 
 const router = useRouter()
 const { problems, reload } = useAlgoProblems()
+const aiStore = useAIStore()
+
+const generatingTestCases = ref(false)
+const aiGenerateError = ref('')
 
 const showImportModal = ref(false)
 const importText = ref('')
@@ -172,6 +179,109 @@ function addHint() {
 function removeHint(i: number) {
   form.value.hints.splice(i, 1)
 }
+
+async function generateTestCasesWithAI() {
+  aiGenerateError.value = ''
+
+  const apiKey = aiStore.getProviderApiKey(aiStore.config.provider)
+  if (!apiKey) {
+    aiGenerateError.value = '请先在设置中为 ' + getAIProviderPreset(aiStore.config.provider).label + ' 配置 API Key'
+    return
+  }
+  if (!aiStore.config.enabled) {
+    aiGenerateError.value = '请先在设置中启用 AI 功能'
+    return
+  }
+
+  if (!form.value.title.trim() || !form.value.description.trim()) {
+    aiGenerateError.value = '请先填写标题和题目描述'
+    return
+  }
+
+  generatingTestCases.value = true
+
+  const sampleText = form.value.samples
+    .filter((s) => s.input || s.output)
+    .map((s, i) => `样例 ${i + 1}：\n输入：\n${s.input}\n输出：\n${s.output}`)
+    .join('\n\n') || '暂无'
+
+  const prompt = `你是一位 ACM 算法题的测试用例构造专家。
+
+请根据以下题目信息，构造 5-8 组测试用例（包括公开样例和隐藏测试用例）。
+
+【题目信息】
+标题：${form.value.title}
+描述：${form.value.description}
+输入说明：${form.value.inputDesc || '无'}
+输出说明：${form.value.outputDesc || '无'}
+已有样例：
+${sampleText}
+
+【要求】
+1. 每组测试用例包含 input（字符串）和 output（字符串）两个字段
+2. 前两组作为公开样例（isPublic: true），其余为隐藏测试用例（isPublic: false）
+3. 测试用例应覆盖：边界情况、普通情况、特殊情况
+4. input 和 output 中的换行用 \\n 表示（实际内容中的换行就是换行符）
+5. 只输出 JSON 数组，不要输出任何其他文字（包括 markdown 代码块标记）
+
+【输出格式】
+[
+  { "input": "...", "output": "...", "isPublic": true },
+  ...
+]`
+
+  try {
+    const fullText = await requestChatCompletion({
+      config: {
+        apiKey,
+        baseUrl: aiStore.config.baseUrl,
+        model: aiStore.config.model,
+        temperature: 0.7,
+        maxTokens: 4000,
+      },
+      messages: [
+        { role: 'system', content: '你是 ACM 算法题测试用例构造专家，只输出纯 JSON 数组，不输出任何其他文字。' },
+        { role: 'user', content: prompt },
+      ],
+    })
+
+    const jsonText = fullText.replace(/^\s*`{3}(?:json)?\s*|\s*`{3}\s*$/gi, '').trim()
+    const parsed = JSON.parse(jsonText)
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('AI 返回的不是数组')
+    }
+
+    const newCases: AlgoTestCase[] = parsed
+      .filter((item: unknown) => item && typeof item === 'object')
+      .map((item: Record<string, unknown>) => ({
+        input: String(item.input ?? ''),
+        output: String(item.output ?? ''),
+        isPublic: item.isPublic === true,
+      }))
+      .filter((tc) => tc.input || tc.output)
+
+    if (newCases.length === 0) {
+      throw new Error('AI 没有返回有效的测试用例')
+    }
+
+    // 自动把 isPublic=true 的同步到 samples
+    const publicCases = newCases.filter((tc) => tc.isPublic)
+    if (publicCases.length > 0) {
+      form.value.samples = publicCases.map((tc) => ({
+        input: tc.input,
+        output: tc.output,
+        explanation: '',
+      }))
+    }
+
+    form.value.testCases = newCases.filter((tc) => !tc.isPublic)
+  } catch (err: any) {
+    aiGenerateError.value = 'AI 生成失败：' + (err.message || String(err))
+  } finally {
+    generatingTestCases.value = false
+  }
+}
 </script>
 
 <template>
@@ -277,7 +387,20 @@ function removeHint(i: number) {
         </div>
 
         <div>
-          <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">隐藏测试用例</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px">
+            <span style="font-size: 13px; font-weight: 600">测试用例</span>
+            <button
+              type="button"
+              class="btn-ghost-sm"
+              :disabled="generatingTestCases"
+              @click="generateTestCasesWithAI"
+            >
+              {{ generatingTestCases ? '生成中...' : 'AI 生成测试用例' }}
+            </button>
+          </div>
+          <div v-if="aiGenerateError" style="margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; background: rgba(239,68,68,0.06); color: #ef4444; font-size: 12px">
+            {{ aiGenerateError }}
+          </div>
           <div v-for="(tc, i) in form.testCases" :key="i" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-bottom: 6px">
             <textarea v-model="tc.input" placeholder="输入" class="form-textarea" rows="2" />
             <textarea v-model="tc.output" placeholder="输出" class="form-textarea" rows="2" />
