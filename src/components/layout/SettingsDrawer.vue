@@ -1603,74 +1603,6 @@ const categoryEntries = computed(() =>
             为每个 AI 提供者配置 API Key，配置完成后即可在模型页选择对应模型。
           </p>
 
-          <!-- Search box -->
-          <div style="position: relative">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              style="
-                position: absolute;
-                left: 10px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: var(--text-3);
-              "
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
-            <input
-              v-model="providerSearchQuery"
-              type="text"
-              placeholder="搜索供应商..."
-              style="
-                width: 100%;
-                padding: 8px 12px 8px 32px;
-                border-radius: 8px;
-                border: 1px solid var(--border);
-                background: var(--surface);
-                color: var(--text);
-                font-size: 13px;
-                outline: none;
-                box-sizing: border-box;
-              "
-            />
-            <button
-              v-if="providerSearchQuery"
-              type="button"
-              @click="providerSearchQuery = ''"
-              style="
-                position: absolute;
-                right: 8px;
-                top: 50%;
-                transform: translateY(-50%);
-                background: none;
-                border: none;
-                color: var(--text-3);
-                cursor: pointer;
-                padding: 2px;
-                display: flex;
-                align-items: center;
-              "
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
           <!-- Custom provider (always at top) -->
           <div
             style="
@@ -1815,6 +1747,74 @@ const categoryEntries = computed(() =>
                 删除认证
               </button>
             </div>
+          </div>
+
+          <!-- Search box -->
+          <div style="position: relative">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              style="
+                position: absolute;
+                left: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: var(--text-3);
+              "
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              v-model="providerSearchQuery"
+              type="text"
+              placeholder="搜索供应商..."
+              style="
+                width: 100%;
+                padding: 8px 12px 8px 32px;
+                border-radius: 8px;
+                border: 1px solid var(--border);
+                background: var(--surface);
+                color: var(--text);
+                font-size: 13px;
+                outline: none;
+                box-sizing: border-box;
+              "
+            />
+            <button
+              v-if="providerSearchQuery"
+              type="button"
+              @click="providerSearchQuery = ''"
+              style="
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: var(--text-3);
+                cursor: pointer;
+                padding: 2px;
+                display: flex;
+                align-items: center;
+              "
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
 
           <!-- Provider list -->
@@ -2016,6 +2016,106 @@ const categoryEntries = computed(() =>
             API Key。
           </p>
 
+          <!-- Custom provider (always at top) -->
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 12px; font-weight: 600; color: var(--text-2)"
+                >自定义兼容接口</span
+              >
+              <span
+                :style="{
+                  fontSize: '11px',
+                  padding: '2px 7px',
+                  borderRadius: '5px',
+                  fontWeight: 500,
+                  background: aiStore.isProviderAuthenticated('custom')
+                    ? 'var(--success-light)'
+                    : 'var(--surface-3)',
+                  color: aiStore.isProviderAuthenticated('custom')
+                    ? 'var(--success)'
+                    : 'var(--text-3)',
+                }"
+                >{{
+                  aiStore.isProviderAuthenticated("custom")
+                    ? "已认证"
+                    : "未认证"
+                }}</span
+              >
+            </div>
+            <button
+              type="button"
+              @click="
+                aiStore.isProviderAuthenticated('custom') &&
+                  handleSelectModel('custom', aiStore.config.model)
+              "
+              :disabled="!aiStore.isProviderAuthenticated('custom')"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 10px;
+                border-radius: 8px;
+                border: 1px solid var(--border);
+                background: var(--surface);
+                font-size: 12px;
+                cursor: pointer;
+                text-align: left;
+                transition: all 0.12s;
+              "
+              :style="{
+                borderColor:
+                  aiStore.config.provider === 'custom'
+                    ? 'var(--primary)'
+                    : 'var(--border)',
+                background:
+                  aiStore.config.provider === 'custom'
+                    ? 'var(--primary-light)'
+                    : 'var(--surface)',
+                color:
+                  aiStore.config.provider === 'custom'
+                    ? 'var(--primary)'
+                    : 'var(--text-2)',
+                opacity: aiStore.isProviderAuthenticated('custom') ? 1 : 0.5,
+                cursor: aiStore.isProviderAuthenticated('custom')
+                  ? 'pointer'
+                  : 'not-allowed',
+              }"
+            >
+              <div
+                style="
+                  width: 14px;
+                  height: 14px;
+                  border-radius: 50%;
+                  border: 2px solid;
+                  flex-shrink: 0;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+                :style="{
+                  borderColor:
+                    aiStore.config.provider === 'custom'
+                      ? 'var(--primary)'
+                      : 'var(--border)',
+                }"
+              >
+                <div
+                  v-if="aiStore.config.provider === 'custom'"
+                  style="
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                  "
+                />
+              </div>
+              <span style="font-weight: 500">{{
+                aiStore.config.model || "未设置模型"
+              }}</span>
+            </button>
+          </div>
+
           <div
             v-for="preset in AI_PROVIDER_PRESETS.filter(
               (p) => p.id !== 'custom'
@@ -2136,105 +2236,6 @@ const categoryEntries = computed(() =>
             </div>
           </div>
 
-          <!-- Custom provider -->
-          <div style="display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 8px">
-              <span
-                style="font-size: 12px; font-weight: 600; color: var(--text-2)"
-                >自定义兼容接口</span
-              >
-              <span
-                :style="{
-                  fontSize: '11px',
-                  padding: '2px 7px',
-                  borderRadius: '5px',
-                  fontWeight: 500,
-                  background: aiStore.isProviderAuthenticated('custom')
-                    ? 'var(--success-light)'
-                    : 'var(--surface-3)',
-                  color: aiStore.isProviderAuthenticated('custom')
-                    ? 'var(--success)'
-                    : 'var(--text-3)',
-                }"
-                >{{
-                  aiStore.isProviderAuthenticated("custom")
-                    ? "已认证"
-                    : "未认证"
-                }}</span
-              >
-            </div>
-            <button
-              type="button"
-              @click="
-                aiStore.isProviderAuthenticated('custom') &&
-                  handleSelectModel('custom', aiStore.config.model)
-              "
-              :disabled="!aiStore.isProviderAuthenticated('custom')"
-              style="
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                padding: 8px 10px;
-                border-radius: 8px;
-                border: 1px solid var(--border);
-                background: var(--surface);
-                font-size: 12px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.12s;
-              "
-              :style="{
-                borderColor:
-                  aiStore.config.provider === 'custom'
-                    ? 'var(--primary)'
-                    : 'var(--border)',
-                background:
-                  aiStore.config.provider === 'custom'
-                    ? 'var(--primary-light)'
-                    : 'var(--surface)',
-                color:
-                  aiStore.config.provider === 'custom'
-                    ? 'var(--primary)'
-                    : 'var(--text-2)',
-                opacity: aiStore.isProviderAuthenticated('custom') ? 1 : 0.5,
-                cursor: aiStore.isProviderAuthenticated('custom')
-                  ? 'pointer'
-                  : 'not-allowed',
-              }"
-            >
-              <div
-                style="
-                  width: 14px;
-                  height: 14px;
-                  border-radius: 50%;
-                  border: 2px solid;
-                  flex-shrink: 0;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                "
-                :style="{
-                  borderColor:
-                    aiStore.config.provider === 'custom'
-                      ? 'var(--primary)'
-                      : 'var(--border)',
-                }"
-              >
-                <div
-                  v-if="aiStore.config.provider === 'custom'"
-                  style="
-                    width: 7px;
-                    height: 7px;
-                    border-radius: 50%;
-                    background: var(--primary);
-                  "
-                />
-              </div>
-              <span style="font-weight: 500">{{
-                aiStore.config.model || "未设置模型"
-              }}</span>
-            </button>
-          </div>
         </template>
 
         <!-- ─── AI Tab (advanced) ─── -->

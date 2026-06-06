@@ -66,6 +66,27 @@ const router = createRouter({
       component: () => import('../pages/QuestionManager.vue'),
     },
     {
+      path: '/algo',
+      name: 'algo-list',
+      component: () => import('../pages/AlgoList.vue'),
+    },
+    {
+      path: '/algo/:id',
+      name: 'algo-detail',
+      component: () => import('../pages/AlgoDetail.vue'),
+      props: true,
+    },
+    {
+      path: '/algo/manage',
+      name: 'algo-manage',
+      component: () => import('../pages/AlgoManager.vue'),
+    },
+    {
+      path: '/algo/practice',
+      name: 'algo-practice',
+      component: () => import('../pages/AlgoPractice.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

@@ -318,3 +318,58 @@ export function getModuleColor(module: string): string {
   }
   return _paletteColors[hash % _paletteColors.length]
 }
+
+/* ─── Algorithm Module ─── */
+
+export interface AlgoProblem {
+  id: string
+  title: string
+  module: Module
+  difficulty: Difficulty
+  description: string
+  inputDesc: string
+  outputDesc: string
+  samples: AlgoSample[]
+  testCases: AlgoTestCase[]
+  hints: string[]
+  tags: string[]
+  source?: string
+  timeLimit?: number
+  memoryLimit?: number
+}
+
+export interface AlgoSample {
+  input: string
+  output: string
+  explanation?: string
+}
+
+export interface AlgoTestCase {
+  input: string
+  output: string
+  isPublic: boolean
+}
+
+export type AlgoLanguage = 'javascript' | 'python' | 'java'
+
+export type AlgoStatus = 'ac' | 'wa' | 'tle' | 're' | 'ce' | 'pending'
+
+export interface AlgoSubmission {
+  id: string
+  problemId: string
+  code: string
+  language: AlgoLanguage
+  status: AlgoStatus
+  passedCount: number
+  totalCount: number
+  runtime?: number
+  errorMessage?: string
+  createdAt: number
+}
+
+export interface AlgoNote {
+  problemId: string
+  content: string
+  createdAt: number
+  updatedAt: number
+}

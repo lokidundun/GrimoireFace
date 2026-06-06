@@ -11,6 +11,7 @@ const studyStore = useStudyStore();
 const navItems = [
   { path: "/", label: "概览" },
   { path: "/questions", label: "题库" },
+  { path: "/algo", label: "算法" },
   { path: "/practice", label: "练习" },
   { path: "/weak", label: "薄弱点" },
   { path: "/manage", label: "管理" },

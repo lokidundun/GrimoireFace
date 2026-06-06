@@ -1,5 +1,8 @@
 import { type IDBPDatabase, openDB } from 'idb'
 import type {
+  AlgoNote,
+  AlgoProblem,
+  AlgoSubmission,
   JdMatchReport,
   MockInterviewSession,
   Question,
@@ -12,7 +15,7 @@ import type {
 } from '../types'
 
 const DB_NAME = 'grimoireface_db'
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 export const STORES = {
   QUESTIONS: 'questions',
@@ -24,6 +27,9 @@ export const STORES = {
   QUESTION_FLAGS: 'question_flags',
   MOCK_INTERVIEWS: 'mock_interviews',
   JD_MATCH_REPORTS: 'jd_match_reports',
+  ALGO_PROBLEMS: 'algo_problems',
+  ALGO_SUBMISSIONS: 'algo_submissions',
+  ALGO_NOTES: 'algo_notes',
   META: 'meta',
 } as const
 
@@ -139,6 +145,27 @@ function getDB(): Promise<IDBPDatabase> {
         // Meta store (for tracking loaded modules, version, etc.)
         if (!db.objectStoreNames.contains(STORES.META)) {
           db.createObjectStore(STORES.META, { keyPath: 'key' })
+        }
+
+        // Algorithm problems store
+        if (!db.objectStoreNames.contains(STORES.ALGO_PROBLEMS)) {
+          const ap = db.createObjectStore(STORES.ALGO_PROBLEMS, { keyPath: 'id' })
+          ap.createIndex('module', 'module', { unique: false })
+          ap.createIndex('difficulty', 'difficulty', { unique: false })
+          ap.createIndex('source', 'source', { unique: false })
+        }
+
+        // Algorithm submissions store
+        if (!db.objectStoreNames.contains(STORES.ALGO_SUBMISSIONS)) {
+          const as = db.createObjectStore(STORES.ALGO_SUBMISSIONS, { keyPath: 'id' })
+          as.createIndex('problemId', 'problemId', { unique: false })
+          as.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        // Algorithm notes store
+        if (!db.objectStoreNames.contains(STORES.ALGO_NOTES)) {
+          const an = db.createObjectStore(STORES.ALGO_NOTES, { keyPath: 'problemId' })
+          an.createIndex('updatedAt', 'updatedAt', { unique: false })
         }
       },
     })
@@ -938,7 +965,7 @@ export async function removeCustomSource(source: string): Promise<void> {
 // ─── Export all data (for backup) ────────────────────────────────────────────
 
 export async function exportAllData(): Promise<{
-  formatVersion: 8
+  formatVersion: 9
   exportedAt: string
   questions: Question[]
   studyRecords: StudyRecord[]
@@ -948,6 +975,9 @@ export async function exportAllData(): Promise<{
   questionFlags: QuestionFlag[]
   mockInterviews: MockInterviewSession[]
   jdMatchReports: JdMatchReport[]
+  algoProblems: AlgoProblem[]
+  algoSubmissions: AlgoSubmission[]
+  algoNotes: AlgoNote[]
   customSources: string[]
   customCategories: CategoryMap
 }> {
@@ -960,6 +990,9 @@ export async function exportAllData(): Promise<{
     questionFlags,
     mockInterviews,
     jdMatchReports,
+    algoProblems,
+    algoSubmissions,
+    algoNotes,
     customSources,
     categoryMap,
   ] = await Promise.all([
@@ -971,13 +1004,16 @@ export async function exportAllData(): Promise<{
     getAllQuestionFlags(),
     getAllMockInterviews(),
     getAllJdMatchReports(),
+    getAllAlgoProblems(),
+    getAllAlgoSubmissions(),
+    getAllAlgoNotes(),
     getCustomSources(),
     getCategoryMap(),
   ])
   const customCategories: CategoryMap = { ...categoryMap }
 
   return {
-    formatVersion: 8,
+    formatVersion: 9,
     exportedAt: new Date().toISOString(),
     questions,
     studyRecords,
@@ -987,6 +1023,9 @@ export async function exportAllData(): Promise<{
     questionFlags,
     mockInterviews,
     jdMatchReports,
+    algoProblems,
+    algoSubmissions,
+    algoNotes,
     customSources,
     customCategories,
   }
@@ -1006,6 +1045,9 @@ export async function resetDatabase(): Promise<void> {
     db.clear(STORES.QUESTION_FLAGS),
     db.clear(STORES.MOCK_INTERVIEWS),
     db.clear(STORES.JD_MATCH_REPORTS),
+    db.clear(STORES.ALGO_PROBLEMS),
+    db.clear(STORES.ALGO_SUBMISSIONS),
+    db.clear(STORES.ALGO_NOTES),
     db.clear(STORES.META),
   ])
   dbPromise = null
@@ -1018,6 +1060,120 @@ export async function resetDatabase(): Promise<void> {
 export async function getActiveModules(): Promise<string[]> {
   const all = await getAllQuestions()
   return [...new Set(all.map((q) => q.module))]
+}
+
+// ─── Algorithm Problems ───────────────────────────────────────────────────────
+
+export async function bulkPutAlgoProblems(problems: AlgoProblem[]): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(STORES.ALGO_PROBLEMS, 'readwrite')
+  await Promise.all([...problems.map((p) => tx.store.put(p)), tx.done])
+}
+
+export async function getAllAlgoProblems(): Promise<AlgoProblem[]> {
+  const db = await getDB()
+  return db.getAll(STORES.ALGO_PROBLEMS)
+}
+
+export async function getAlgoProblemById(id: string): Promise<AlgoProblem | undefined> {
+  const db = await getDB()
+  return db.get(STORES.ALGO_PROBLEMS, id)
+}
+
+export async function getAlgoProblemsByModule(module: string): Promise<AlgoProblem[]> {
+  const db = await getDB()
+  return db.getAllFromIndex(STORES.ALGO_PROBLEMS, 'module', module)
+}
+
+export async function getAlgoProblemCount(): Promise<number> {
+  const db = await getDB()
+  return db.count(STORES.ALGO_PROBLEMS)
+}
+
+export async function putAlgoProblem(problem: AlgoProblem): Promise<void> {
+  const db = await getDB()
+  const normalized: AlgoProblem = {
+    ...problem,
+    samples: problem.samples ?? [],
+    testCases: problem.testCases ?? [],
+    hints: problem.hints ?? [],
+    tags: problem.tags ?? [],
+  }
+  await db.put(STORES.ALGO_PROBLEMS, normalized)
+}
+
+export async function deleteAlgoProblemById(id: string): Promise<void> {
+  const db = await getDB()
+  await Promise.all([
+    db.delete(STORES.ALGO_PROBLEMS, id),
+    db.delete(STORES.ALGO_NOTES, id),
+  ])
+  // Also delete related submissions
+  const tx = db.transaction(STORES.ALGO_SUBMISSIONS, 'readwrite')
+  const index = tx.store.index('problemId')
+  let cursor = await index.openCursor(id)
+  while (cursor) {
+    await cursor.delete()
+    cursor = await cursor.continue()
+  }
+  await tx.done
+}
+
+export async function algoProblemExists(id: string): Promise<boolean> {
+  const db = await getDB()
+  const p = await db.get(STORES.ALGO_PROBLEMS, id)
+  return p !== undefined
+}
+
+// ─── Algorithm Submissions ────────────────────────────────────────────────────
+
+export async function getSubmissionsByProblem(problemId: string): Promise<AlgoSubmission[]> {
+  const db = await getDB()
+  return db.getAllFromIndex(STORES.ALGO_SUBMISSIONS, 'problemId', problemId)
+}
+
+export async function getAllAlgoSubmissions(): Promise<AlgoSubmission[]> {
+  const db = await getDB()
+  return db.getAll(STORES.ALGO_SUBMISSIONS)
+}
+
+export async function putAlgoSubmission(submission: AlgoSubmission): Promise<void> {
+  const db = await getDB()
+  await db.put(STORES.ALGO_SUBMISSIONS, submission)
+}
+
+export async function getAlgoSubmissionById(id: string): Promise<AlgoSubmission | undefined> {
+  const db = await getDB()
+  return db.get(STORES.ALGO_SUBMISSIONS, id)
+}
+
+export async function getAllAlgoNotes(): Promise<AlgoNote[]> {
+  const db = await getDB()
+  return db.getAll(STORES.ALGO_NOTES)
+}
+
+// ─── Algorithm Notes ──────────────────────────────────────────────────────────
+
+export async function getAlgoNote(problemId: string): Promise<AlgoNote | undefined> {
+  const db = await getDB()
+  return db.get(STORES.ALGO_NOTES, problemId)
+}
+
+export async function putAlgoNote(note: AlgoNote): Promise<void> {
+  const db = await getDB()
+  const now = Date.now()
+  const existing = await getAlgoNote(note.problemId)
+  const trimmed = note.content.trim()
+  if (!trimmed) {
+    await db.delete(STORES.ALGO_NOTES, note.problemId)
+    return
+  }
+  await db.put(STORES.ALGO_NOTES, {
+    problemId: note.problemId,
+    content: note.content,
+    createdAt: existing?.createdAt ?? note.createdAt ?? now,
+    updatedAt: now,
+  })
 }
 
 // ─── Built-in categories CRUD ─────────────────────────────────────────────────

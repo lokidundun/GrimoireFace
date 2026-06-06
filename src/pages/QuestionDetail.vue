@@ -525,7 +525,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
         </div>
 
         <!-- Question text -->
-        <h1 style="font-size: 17px; font-weight: 600; color: var(--text); line-height: 1.65; letter-spacing: -0.005em">{{ question.question }}</h1>
+        <MarkdownRenderer :content="question.question" />
 
         <!-- Tags -->
         <div v-if="question.tags.length > 0 || reviewCount > 0" style="display: flex; flex-wrap: wrap; gap: 6px">
@@ -682,9 +682,33 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
                 <span style="font-size: 12px; color: var(--text-3)">请前往设置 → 认证 中配置</span>
               </div>
 
-              <template v-else v-for="(preset, pIdx) in authenticatedPresetProviders" :key="preset.id">
+              <template v-if="ai.isProviderAuthenticated('custom')">
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-3); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.5px">自定义</div>
+                <button
+                  type="button"
+                  @click="selectModel('custom', ai.config.model)"
+                  style="
+                    display: flex; align-items: center; justify-content: space-between;
+                    width: 100%; padding: 5px 8px; border-radius: 7px; border: none;
+                    background: transparent; color: var(--text-2); font-size: 12px;
+                    cursor: pointer; text-align: left; transition: all 0.12s;
+                  "
+                  :style="ai.config.provider === 'custom'
+                    ? { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 500 }
+                    : {}"
+                  @mouseenter="$event.currentTarget.style.background = 'var(--surface-2)'"
+                  @mouseleave="$event.currentTarget.style.background = ai.config.provider === 'custom' ? 'var(--primary-light)' : 'transparent'"
+                >
+                  <span>{{ ai.config.model || '自定义模型' }}</span>
+                  <svg v-if="ai.config.provider === 'custom'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              </template>
+
+              <template v-if="authenticatedPresetProviders.length > 0" v-for="(preset, pIdx) in authenticatedPresetProviders" :key="preset.id">
                 <div
-                  v-if="pIdx > 0"
+                  v-if="pIdx > 0 || ai.isProviderAuthenticated('custom')"
                   style="height: 1px; background: var(--border-subtle); margin: 4px 6px"
                 />
                 <div style="font-size: 11px; font-weight: 600; color: var(--text-3); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.5px">{{ preset.shortLabel }}</div>
@@ -707,33 +731,6 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
                 >
                   <span>{{ m.label }}</span>
                   <svg v-if="ai.config.provider === preset.id && ai.config.model === m.value" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </button>
-              </template>
-
-              <template v-if="ai.isProviderAuthenticated('custom')"
-              >
-                <div v-if="authenticatedPresetProviders.length > 0" style="height: 1px; background: var(--border-subtle); margin: 4px 6px" />
-                <div style="font-size: 11px; font-weight: 600; color: var(--text-3); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.5px"
-              >自定义</div>
-                <button
-                  type="button"
-                  @click="selectModel('custom', ai.config.model)"
-                  style="
-                    display: flex; align-items: center; justify-content: space-between;
-                    width: 100%; padding: 5px 8px; border-radius: 7px; border: none;
-                    background: transparent; color: var(--text-2); font-size: 12px;
-                    cursor: pointer; text-align: left; transition: all 0.12s;
-                  "
-                  :style="ai.config.provider === 'custom'
-                    ? { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 500 }
-                    : {}"
-                  @mouseenter="$event.currentTarget.style.background = 'var(--surface-2)'"
-                  @mouseleave="$event.currentTarget.style.background = ai.config.provider === 'custom' ? 'var(--primary-light)' : 'transparent'"
-                >
-                  <span>{{ ai.config.model || '自定义模型' }}</span>
-                  <svg v-if="ai.config.provider === 'custom'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </button>

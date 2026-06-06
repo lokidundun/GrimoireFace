@@ -617,6 +617,29 @@ function getNotePreview(content: string): string {
             </div>
           </div>
 
+          <!-- Algorithm Module -->
+          <div class="card animate-fade-in stagger-3" style="padding:20px">
+            <div class="flex items-center justify-between mb-2.5">
+              <h2 style="font-size:13px;font-weight:600;color:var(--text)">算法刷题</h2>
+              <RouterLink
+                to="/algo"
+                class="text-xs no-underline"
+                style="color:var(--primary)"
+              >进入</RouterLink>
+            </div>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;line-height:1.5">
+              ACM 模式在线判题，支持 JavaScript、Python、Java
+            </p>
+            <div class="flex gap-2" style="border-top:1px solid var(--border-subtle);padding-top:12px">
+              <RouterLink to="/algo" class="flex-1 no-underline">
+                <button class="btn btn-secondary btn-sm w-full">浏览题目</button>
+              </RouterLink>
+              <RouterLink to="/algo/practice" class="flex-1 no-underline">
+                <button class="btn btn-primary btn-sm w-full">开始刷题</button>
+              </RouterLink>
+            </div>
+          </div>
+
           <!-- Module Progress -->
           <div class="card animate-fade-in stagger-3" style="padding:20px">
             <div class="flex items-center justify-between mb-2.5">

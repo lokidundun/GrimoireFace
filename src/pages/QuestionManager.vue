@@ -31,6 +31,9 @@ const isAllPageSelected = computed(() =>
   pagedQuestions.value.length > 0 && pagedQuestions.value.every((q) => selectedIds.value.has(q.id)),
 )
 
+const questionTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const answerTextareaRef = ref<HTMLTextAreaElement | null>(null)
+
 const form = ref({
   id: '',
   module: '',
@@ -45,6 +48,96 @@ const modules = computed(() => {
   const set = new Set(questions.value.map((q) => q.module))
   return [...set].sort()
 })
+
+// ─── Markdown Toolbar ─────────────────────────────────────────────────────────
+
+function wrapSelection(
+  textareaRef: HTMLTextAreaElement | null,
+  before: string,
+  after: string = before,
+  placeholder: string = '',
+) {
+  if (!textareaRef) return
+  const start = textareaRef.selectionStart
+  const end = textareaRef.selectionEnd
+  const text = textareaRef.value
+  const selected = text.slice(start, end)
+  const replacement = selected
+    ? before + selected + after
+    : before + placeholder + after
+  textareaRef.setRangeText(replacement, start, end, 'end')
+  if (selected) {
+    textareaRef.selectionStart = start + before.length
+    textareaRef.selectionEnd = start + before.length + selected.length
+  } else {
+    textareaRef.selectionStart = start + before.length
+    textareaRef.selectionEnd = start + before.length + placeholder.length
+  }
+  textareaRef.focus()
+  // Update form model
+  if (textareaRef === questionTextareaRef.value) {
+    form.value.question = textareaRef.value
+  } else if (textareaRef === answerTextareaRef.value) {
+    form.value.answer = textareaRef.value
+  }
+}
+
+const mdTools: { label: string; icon: string; action: (ta: HTMLTextAreaElement | null) => void }[] = [
+  {
+    label: '加粗',
+    icon: 'B',
+    action: (ta) => wrapSelection(ta, '**', '**', '加粗文字'),
+  },
+  {
+    label: '斜体',
+    icon: 'I',
+    action: (ta) => wrapSelection(ta, '*', '*', '斜体文字'),
+  },
+  {
+    label: '标题',
+    icon: 'H',
+    action: (ta) => wrapSelection(ta, '## ', '', '标题'),
+  },
+  {
+    label: '引用',
+    icon: '&quot;',
+    action: (ta) => wrapSelection(ta, '> ', '', '引用内容'),
+  },
+  {
+    label: '代码',
+    icon: '<>',
+    action: (ta) => wrapSelection(ta, '`', '`', 'code'),
+  },
+  {
+    label: '代码块',
+    icon: '```',
+    action: (ta) => {
+      if (!ta) return
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const selected = ta.value.slice(start, end)
+      const replacement = selected
+        ? '```\n' + selected + '\n```'
+        : '```\n代码块\n```'
+      ta.setRangeText(replacement, start, end, 'end')
+      if (selected) {
+        ta.selectionStart = start + 4
+        ta.selectionEnd = start + 4 + selected.length
+      } else {
+        ta.selectionStart = start + 4
+        ta.selectionEnd = start + 4 + 3
+      }
+      ta.focus()
+      if (ta === questionTextareaRef.value) form.value.question = ta.value
+      else if (ta === answerTextareaRef.value) form.value.answer = ta.value
+    },
+  },
+  {
+    label: '列表',
+    icon: '-',
+    action: (ta) => wrapSelection(ta, '- ', '', '列表项'),
+  },
+]
 
 const filteredQuestions = computed(() => {
   let result = questions.value
@@ -585,12 +678,42 @@ function difficultyColor(d: Difficulty) {
 
               <div>
                 <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 4px">题干 <span style="color: var(--danger)">*</span></label>
-                <textarea v-model="form.question" rows="4" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; resize: vertical; font-family: inherit" placeholder="输入题目内容，支持 Markdown"></textarea>
+                <!-- Markdown Toolbar -->
+                <div style="display: flex; gap: 2px; margin-bottom: 4px; flex-wrap: wrap">
+                  <button
+                    v-for="tool in mdTools"
+                    :key="tool.label"
+                    type="button"
+                    :title="tool.label"
+                    @click="tool.action(questionTextareaRef)"
+                    style="padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border-subtle); background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.1s; line-height: 1"
+                    @mouseenter="($event.target as HTMLElement).style.background = 'var(--surface-3)'"
+                    @mouseleave="($event.target as HTMLElement).style.background = 'var(--surface-2)'"
+                  >
+                    {{ tool.icon }}
+                  </button>
+                </div>
+                <textarea ref="questionTextareaRef" v-model="form.question" rows="4" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; resize: vertical; font-family: inherit" placeholder="输入题目内容，支持 Markdown"></textarea>
               </div>
 
               <div>
                 <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 4px">答案</label>
-                <textarea v-model="form.answer" rows="6" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; resize: vertical; font-family: inherit" placeholder="输入答案内容，支持 Markdown"></textarea>
+                <!-- Markdown Toolbar -->
+                <div style="display: flex; gap: 2px; margin-bottom: 4px; flex-wrap: wrap">
+                  <button
+                    v-for="tool in mdTools"
+                    :key="tool.label"
+                    type="button"
+                    :title="tool.label"
+                    @click="tool.action(answerTextareaRef)"
+                    style="padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border-subtle); background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.1s; line-height: 1"
+                    @mouseenter="($event.target as HTMLElement).style.background = 'var(--surface-3)'"
+                    @mouseleave="($event.target as HTMLElement).style.background = 'var(--surface-2)'"
+                  >
+                    {{ tool.icon }}
+                  </button>
+                </div>
+                <textarea ref="answerTextareaRef" v-model="form.answer" rows="6" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; resize: vertical; font-family: inherit" placeholder="输入答案内容，支持 Markdown"></textarea>
               </div>
 
               <div>
