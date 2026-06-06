@@ -259,49 +259,22 @@ const schemaFields = [
 <template>
   <div class="page-container" style="max-width: 760px; display: flex; flex-direction: column; gap: 28px">
     <!-- Header -->
-    <div class="animate-fade-in">
-      <h1 style="font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px">
-        导入题目
-      </h1>
-      <p style="font-size: 13px; color: var(--text-3)">
-        支持拖拽 JSON 文件或粘贴 JSON 内容，让 AI 按格式生成后直接导入
-      </p>
-    </div>
-
-    <!-- Builtin Library Card -->
-    <div class="card animate-fade-in stagger-1 builtin-library-card" style="padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
-      <div style="display: flex; align-items: flex-start; gap: 12px; min-width: 0">
-        <span style="width: 34px; height: 34px; border-radius: 10px; background: var(--primary-light); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-          </svg>
-        </span>
-        <div style="min-width: 0">
-          <p style="font-size: 14px; font-weight: 600; color: var(--text)">内置题库</p>
-          <p style="font-size: 12px; color: var(--text-3); line-height: 1.6; margin-top: 3px">
-            {{ builtinCount === null ? '正在读取本地题库状态…' : `本地已有 ${builtinCount!.toLocaleString()} 道内置题，覆盖 ${builtinFileCount ?? 0} 个题库文件。` }}
-          </p>
-          <p style="font-size: 11px; color: var(--text-3); margin-top: 4px">
-            题库版本：{{ BUILTIN_QUESTIONS_VERSION }}
-          </p>
-          <p
-            v-if="builtinMessage"
-            :style="{ fontSize: '12px', color: builtinMessage.type === 'error' ? 'var(--danger)' : 'var(--success)', marginTop: '8px', lineHeight: 1.5 }"
-          >
-            {{ builtinMessage.text }}
-          </p>
-        </div>
+    <div class="animate-fade-in" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+      <div>
+        <h1 style="font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.015em; margin-bottom: 4px">
+          导入题目
+        </h1>
+        <p style="font-size: 13px; color: var(--text-3)">
+          支持拖拽 JSON 文件或粘贴 JSON 内容，让 AI 按格式生成后直接导入
+        </p>
       </div>
       <button
         type="button"
-        class="btn"
-        :class="builtinCount && builtinCount > 0 ? 'btn-secondary' : 'btn-primary'"
-        :disabled="builtinLoading"
-        @click="handleLoadBuiltin"
-        style="height: 32px; padding: 6px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; white-space: nowrap"
+        @click="router.back()"
+        style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; flex-shrink: 0"
       >
-        {{ builtinLoading ? '加载中…' : builtinCount && builtinCount > 0 ? '重刷内置题库' : '加载内置题库' }}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        返回
       </button>
     </div>
 
@@ -658,67 +631,6 @@ const schemaFields = [
       </div>
     </div>
 
-    <!-- Custom Sources Manager -->
-    <div class="animate-fade-in stagger-3" style="display: flex; flex-direction: column; gap: 10px">
-      <div style="display: flex; align-items: center; justify-content: space-between">
-        <p style="font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em">已导入的自定义来源</p>
-        <span v-if="customSources.length > 0" style="font-size: 12px; color: var(--text-3)">{{ customSources.length }} 个来源</span>
-      </div>
-
-      <div v-if="customSources.length === 0" style="padding: 28px 16px; text-align: center; color: var(--text-3); font-size: 13px">
-        暂无自定义来源，导入题目后会在这里显示
-      </div>
-      <div v-else style="display: flex; flex-direction: column; gap: 6px">
-        <div
-          v-for="source in customSources"
-          :key="source"
-          style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-subtle)"
-        >
-          <span style="font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0">{{ source }}</span>
-          <button
-            type="button"
-            @click="handleRemoveSource(source)"
-            style="flex-shrink: 0; display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 7px; font-size: 12px; color: var(--danger); border: 1px solid rgba(239,68,68,0.2); background: transparent; cursor: pointer; transition: all 0.15s"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6M14 11v6" />
-            </svg>
-            删除
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- AI Tip card -->
-    <div class="animate-fade-in stagger-4">
-      <div class="card" style="padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; border-color: rgba(var(--primary-rgb), 0.15); background: var(--primary-light)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-          <line x1="8" y1="8" x2="16" y2="8" />
-          <line x1="8" y1="16" x2="12" y2="16" />
-        </svg>
-        <div style="display: flex; flex-direction: column; gap: 4px">
-          <p style="font-size: 13px; font-weight: 600; color: var(--text)">用 AI 生成题目</p>
-          <p style="font-size: 12px; color: var(--text-2); line-height: 1.6">
-            复制本页的 JSON 格式说明，配合项目提示词让 AI 生成题目。生成完成后粘贴到「粘贴 JSON」区域即可一键导入，ID 重复时会自动加前缀避免冲突。
-          </p>
-          <button
-            type="button"
-            @click="router.push('/prompt')"
-            style="display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0"
-          >
-            查看 AI 出题 Prompt
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 

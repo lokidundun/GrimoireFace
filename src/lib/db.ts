@@ -821,23 +821,23 @@ export async function unregisterModuleFromCategories(moduleName: string): Promis
 }
 
 /**
- * Delete an entire custom category (builtin categories cannot be deleted).
+ * Delete a category.
  */
 export async function deleteCategory(categoryName: string): Promise<void> {
   const map = await getCategoryMap()
-  if (map[categoryName] && !map[categoryName].builtin) {
+  if (map[categoryName]) {
     delete map[categoryName]
     await saveCategoryMap(map)
   }
 }
 
 /**
- * Rename a category (builtin categories cannot be renamed).
+ * Rename a category.
  */
 export async function renameCategory(oldName: string, newName: string): Promise<void> {
   if (oldName === newName) return
   const map = await getCategoryMap()
-  if (!map[oldName] || map[oldName].builtin) return
+  if (!map[oldName]) return
   map[newName] = { ...map[oldName], name: newName }
   delete map[oldName]
   await saveCategoryMap(map)
@@ -974,10 +974,7 @@ export async function exportAllData(): Promise<{
     getCustomSources(),
     getCategoryMap(),
   ])
-  const customCategories: CategoryMap = {}
-  for (const [key, entry] of Object.entries(categoryMap)) {
-    if (!entry.builtin) customCategories[key] = entry
-  }
+  const customCategories: CategoryMap = { ...categoryMap }
 
   return {
     formatVersion: 8,

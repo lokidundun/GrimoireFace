@@ -154,7 +154,7 @@ const parsingResume = ref(false);
 const analyzing = ref(false);
 
 const aiReady = computed(
-  () => config.enabled && config.apiKey.trim().length > 0
+  () => config.enabled && aiStore.isProviderAuthenticated(config.provider)
 );
 const displayReport = computed(() => streamingText.value || report.value);
 
@@ -206,7 +206,7 @@ async function handleAnalyze() {
   try {
     const result = await requestChatCompletionStream({
       config: {
-        apiKey: config.apiKey,
+        apiKey: aiStore.getProviderApiKey(config.provider),
         baseUrl: config.baseUrl,
         model: config.model,
         temperature: Math.min(0.7, Math.max(0.2, config.temperature)),

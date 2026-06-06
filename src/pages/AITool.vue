@@ -193,7 +193,7 @@ const aiStore = useAIStore()
 const toolId = computed(() => route.params.toolId as string)
 const tool = computed(() => (toolId.value ? TOOL_MAP.get(toolId.value) : undefined))
 
-const aiReady = computed(() => aiStore.config.enabled && aiStore.config.apiKey.trim().length > 0)
+const aiReady = computed(() => aiStore.config.enabled && aiStore.isProviderAuthenticated(aiStore.config.provider))
 
 const values = ref<Record<string, string>>({})
 const result = ref('')
@@ -259,7 +259,7 @@ async function handleGenerate() {
   try {
     const markdown = await requestChatCompletionStream({
       config: {
-        apiKey: aiStore.config.apiKey,
+        apiKey: aiStore.getProviderApiKey(aiStore.config.provider),
         baseUrl: aiStore.config.baseUrl,
         model: aiStore.config.model,
         temperature: Math.min(0.75, Math.max(0.25, aiStore.config.temperature)),

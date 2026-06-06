@@ -13,7 +13,6 @@ const navItems = [
   { path: "/questions", label: "题库" },
   { path: "/practice", label: "练习" },
   { path: "/weak", label: "薄弱点" },
-  { path: "/import", label: "导入" },
   { path: "/manage", label: "管理" },
   {
     path: "/tools",

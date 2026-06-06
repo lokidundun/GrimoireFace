@@ -93,10 +93,7 @@ const moduleStats = computed(() =>
 const categoriesWithModules = computed(() => {
   const activeSet = new Set(activeModules.value)
   const fromMap = Object.values(categoryMap.value)
-    .sort((a, b) => {
-      if (a.builtin !== b.builtin) return a.builtin ? -1 : 1
-      return (a.order ?? 0) - (b.order ?? 0)
-    })
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((cat) => ({
       name: cat.name,
       builtin: cat.builtin,
@@ -324,7 +321,7 @@ function diffChipColor(d: Difficulty | 'all', sel: boolean): string {
                   </button>
                 </div>
                 <div v-else style="padding:16px;border-radius:12px;border:1px dashed var(--border);background:var(--surface);text-align:center;color:var(--text-3);font-size:13px">
-                  暂无模块，请在题库分类配置中上传 JSON 文件
+                  暂无模块，请在管理和设置中查看
                 </div>
               </div>
             </div>

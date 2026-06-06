@@ -47,11 +47,13 @@ export async function requestChatCompletionStream({
   fetchFn = fetch,
   onDelta,
 }: RequestChatCompletionStreamOptions): Promise<string> {
+  // 过滤 API Key 中的非法字符（零宽空格、非 ASCII 等），避免 fetch headers 报错
+  const cleanApiKey = config.apiKey.replace(/[^\x20-\x7E]/g, '')
   const response = await fetchFn(buildChatCompletionsUrl(config.baseUrl), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${cleanApiKey}`,
     },
     signal,
     body: JSON.stringify({

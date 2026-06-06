@@ -94,7 +94,8 @@ function cleanDimensionComment(comment: string): string {
 // ─── State ────────────────────────────────────────────────────────
 
 const router = useRouter()
-const { config } = useAIStore()
+const aiStore = useAIStore()
+const config = aiStore.config
 const fileRef = ref<HTMLInputElement | null>(null)
 const transcriptEndRef = ref<HTMLDivElement | null>(null)
 const reportRef = ref<HTMLDivElement | null>(null)
@@ -192,11 +193,12 @@ async function requestAI(
   maxTokens = 1800,
 ): Promise<string> {
   if (!config.enabled) throw new Error('请先在设置中启用 AI 功能')
-  if (!config.apiKey.trim()) throw new Error('请先在设置中配置 API Key')
+  const apiKey = aiStore.getProviderApiKey(config.provider)
+  if (!apiKey) throw new Error('请先在设置中配置 API Key')
 
   return requestChatCompletionStream({
     config: {
-      apiKey: config.apiKey,
+      apiKey,
       baseUrl: config.baseUrl,
       model: config.model,
       temperature: Math.min(0.8, Math.max(0.3, config.temperature)),
