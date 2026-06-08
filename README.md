@@ -1,5 +1,7 @@
 # GrimoireFace
 
+English | [简体中文](./README.zh-CN.md)
+
 An interview practice assistant built with Vue 3 and Vite. GrimoireFace helps you prepare for technical interviews through structured question banks, mock interviews, algorithm practice, and AI-powered tools — all running locally in your browser with offline support via PWA.
 
 > This project is derived from [iFace](https://github.com/Dogxi/iFace) by [Dogxi](https://github.com/Dogxi). Thank you for the open-source foundation.
@@ -15,6 +17,16 @@ An interview practice assistant built with Vue 3 and Vite. GrimoireFace helps yo
 - **Algorithm Practice** — Track algorithm problems, submissions, and notes
 - **Import & Manage** — Import question banks from JSON and manage your data locally
 - **PWA Support** — Install as a desktop/mobile app with offline caching
+
+## Screenshots
+
+| Homepage | Question Bank | Practice Mode |
+| :------: | :-----------: | :-----------: |
+| ![Homepage](asset/homepage.png) | ![Question Bank](asset/warehouse.png) | ![Practice Mode](asset/practice.png) |
+
+| Algorithm | Manage Data | Settings | Dark Mode |
+| :-------: | :---------: | :------: | :-------: |
+| ![Algorithm](asset/algorithm.png) | ![Manage](asset/manage.png) | ![Settings](asset/setting.png) | ![Dark Mode](asset/dark.png) |
 
 ## Tech Stack
 
